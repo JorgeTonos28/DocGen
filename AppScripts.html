@@ -1,0 +1,1838 @@
+<script>
+  (function() {
+    const state = {
+      boot: window.__BOOTSTRAP__ || {},
+      currentView: 'dashboard',
+      currentDocument: null,
+      currentDetail: null,
+      documentDetailCache: Object.create(null),
+      selectedTemplateKey: '',
+      editingUserEmail: ''
+    };
+
+    const viewTitles = {
+      dashboard: 'Panel',
+      generator: 'Generador',
+      archive: 'Historial',
+      detail: 'Detalle',
+      users: 'Usuarios',
+      catalogs: 'Catálogos',
+      audit: 'Auditoría'
+    };
+
+    const els = {};
+
+    const Busy = {
+      count: 0,
+      show(message) {
+        this.count += 1;
+        els.busyText.textContent = message || 'Espera mientras completamos la operación.';
+        els.busyOverlay.hidden = false;
+      },
+      hide() {
+        this.count = Math.max(0, this.count - 1);
+        if (!this.count) {
+          els.busyOverlay.hidden = true;
+        }
+      },
+      reset() {
+        this.count = 0;
+        els.busyOverlay.hidden = true;
+      }
+    };
+
+    const Modal = {
+      pendingResolver: null,
+      open(options) {
+        els.modalTitle.textContent = options.title || 'Mensaje';
+        els.modalBody.innerHTML = options.body || '';
+        els.modalConfirm.textContent = options.confirmText || 'Aceptar';
+        els.modalCancel.textContent = options.cancelText || 'Cancelar';
+        els.modalCancel.hidden = !options.showCancel;
+        els.appModal.hidden = false;
+        this.pendingResolver = options.resolve || null;
+      },
+      close(result) {
+        els.appModal.hidden = true;
+        if (this.pendingResolver) {
+          this.pendingResolver(result);
+          this.pendingResolver = null;
+        }
+      },
+      alert(title, body) {
+        return new Promise((resolve) => {
+          this.open({ title: title, body: body, showCancel: false, resolve: resolve });
+        });
+      },
+      confirm(title, body, confirmText) {
+        return new Promise((resolve) => {
+          this.open({
+            title: title,
+            body: body,
+            confirmText: confirmText || 'Confirmar',
+            cancelText: 'Cancelar',
+            showCancel: true,
+            resolve: resolve
+          });
+        });
+      }
+    };
+
+    document.addEventListener('DOMContentLoaded', init);
+
+    function init() {
+      breakoutFromIframe();
+      state.boot = ensureBootShape(state.boot);
+      cacheElements();
+      hydrateIdentity();
+      bindEvents();
+      applyRoleVisibility();
+      renderAll();
+      switchView('dashboard');
+    }
+
+    function breakoutFromIframe() {
+      try {
+        if (window.top !== window.self && window.innerWidth < 1024) {
+          window.top.location.href = window.location.href;
+        }
+      } catch (error) {
+      }
+    }
+
+    function cacheElements() {
+      els.busyOverlay = document.getElementById('busyOverlay');
+      els.busyText = document.getElementById('busyText');
+      els.mainContent = document.getElementById('mainContent');
+      els.appModal = document.getElementById('appModal');
+      els.modalTitle = document.getElementById('modalTitle');
+      els.modalBody = document.getElementById('modalBody');
+      els.modalConfirm = document.getElementById('modalConfirmButton');
+      els.modalCancel = document.getElementById('modalCancelButton');
+      els.modalClose = document.getElementById('modalCloseButton');
+      els.sidebar = document.getElementById('sidebar');
+      els.sidebarBackdrop = document.getElementById('sidebarBackdrop');
+      els.sidebarToggle = document.getElementById('sidebarToggle');
+      els.navButtons = Array.from(document.querySelectorAll('.nav-link'));
+      els.viewPanels = Array.from(document.querySelectorAll('[data-view-panel]'));
+      els.viewTitle = document.getElementById('viewTitle');
+      els.userAvatar = document.getElementById('userAvatar');
+      els.userName = document.getElementById('userName');
+      els.userRoleDisplay = document.getElementById('userRoleDisplay');
+      els.appLogo = document.getElementById('appLogo');
+      els.brandFallback = document.getElementById('brandFallback');
+      els.appFooterSignatureWrap = document.getElementById('appFooterSignatureWrap');
+      els.appFooterSignature = document.getElementById('appFooterSignature');
+      els.sidebarVersion = document.getElementById('sidebarVersion');
+      els.newDocumentShortcut = document.getElementById('newDocumentShortcut');
+      els.dashboardMetrics = document.getElementById('dashboardMetrics');
+      els.dashboardRecent = document.getElementById('dashboardRecent');
+      els.dashboardRegional = document.getElementById('dashboardRegional');
+      els.documentForm = document.getElementById('documentForm');
+      els.documentId = document.getElementById('documentId');
+      els.documentType = document.getElementById('documentType');
+      els.regionalSelect = document.getElementById('regionalSelect');
+      els.lineItemsBody = document.getElementById('lineItemsBody');
+      els.documentNotes = document.getElementById('documentNotes');
+      els.addLineButton = document.getElementById('addLineButton');
+      els.resetFormButton = document.getElementById('resetFormButton');
+      els.saveDocumentButton = document.getElementById('saveDocumentButton');
+      els.generatorTitle = document.getElementById('generatorTitle');
+      els.previewMeta = document.getElementById('previewMeta');
+      els.previewContainer = document.getElementById('previewContainer');
+      els.printDocumentButton = document.getElementById('printDocumentButton');
+      els.editFromPreviewButton = document.getElementById('editFromPreviewButton');
+      els.archiveSearch = document.getElementById('archiveSearch');
+      els.archiveStatus = document.getElementById('archiveStatus');
+      els.archiveRegional = document.getElementById('archiveRegional');
+      els.archiveFilterButton = document.getElementById('archiveFilterButton');
+      els.archiveClearButton = document.getElementById('archiveClearButton');
+      els.exportArchiveButton = document.getElementById('exportArchiveButton');
+      els.archiveTableBody = document.getElementById('archiveTableBody');
+      els.detailSubtitle = document.getElementById('detailSubtitle');
+      els.detailSummary = document.getElementById('detailSummary');
+      els.detailLinesList = document.getElementById('detailLinesList');
+      els.detailAudit = document.getElementById('detailAudit');
+      els.detailPreview = document.getElementById('detailPreview');
+      els.detailBackButton = document.getElementById('detailBackButton');
+      els.detailEditButton = document.getElementById('detailEditButton');
+      els.detailPrintButton = document.getElementById('detailPrintButton');
+      els.userForm = document.getElementById('userForm');
+      els.userFormTitle = document.getElementById('userFormTitle');
+      els.userEditingHint = document.getElementById('userEditingHint');
+      els.userEmail = document.getElementById('userEmail');
+      els.userDisplayName = document.getElementById('userDisplayName');
+      els.userRoleInput = document.getElementById('userRoleField');
+      els.userStatus = document.getElementById('userStatus');
+      els.userDepartment = document.getElementById('userDepartment');
+      els.userNotes = document.getElementById('userNotes');
+      els.userResetButton = document.getElementById('userResetButton');
+      els.usersTableBody = document.getElementById('usersTableBody');
+      els.regionalForm = document.getElementById('regionalForm');
+      els.regionalId = document.getElementById('regionalId');
+      els.regionalAbbr = document.getElementById('regionalAbbr');
+      els.regionalName = document.getElementById('regionalName');
+      els.regionalDirector = document.getElementById('regionalDirector');
+      els.regionalSexo = document.getElementById('regionalSexo');
+      els.regionalCargo = document.getElementById('regionalCargo');
+      els.regionalList = document.getElementById('regionalList');
+      els.agreementForm = document.getElementById('agreementForm');
+      els.agreementId = document.getElementById('agreementId');
+      els.agreementName = document.getElementById('agreementName');
+      els.agreementList = document.getElementById('agreementList');
+      els.prefixForm = document.getElementById('prefixForm');
+      els.prefixId = document.getElementById('prefixId');
+      els.prefixCode = document.getElementById('prefixCode');
+      els.prefixDescription = document.getElementById('prefixDescription');
+      els.prefixList = document.getElementById('prefixList');
+      els.templateForm = document.getElementById('templateForm');
+      els.templateSelect = document.getElementById('templateSelect');
+      els.templateHtml = document.getElementById('templateHtml');
+      els.auditSearch = document.getElementById('auditSearch');
+      els.auditFilterButton = document.getElementById('auditFilterButton');
+      els.auditTableBody = document.getElementById('auditTableBody');
+    }
+
+    function hydrateIdentity() {
+      const user = state.boot.currentUser || {};
+      const appVersion = window.__APP_VERSION__ || ((state.boot.app || {}).version) || '0.0.0';
+      els.userAvatar.textContent = getAvatarText(user);
+      els.userAvatar.title = user.displayName || 'Usuario';
+      els.sidebarVersion.textContent = 'v' + appVersion;
+
+      if (window.__APP_LOGO_DATA_URL) {
+        els.appLogo.src = window.__APP_LOGO_DATA_URL;
+        els.appLogo.hidden = false;
+        els.brandFallback.hidden = true;
+      }
+
+      hydrateFooterSignature();
+    }
+
+    function hydrateFooterSignature() {
+      const signatureDataUrl = window.__APP_SIGNATURE_DATA_URL || '';
+      const config = state.boot.config || {};
+      const widthPx = Math.max(0, Number(config.uiSignatureWidthPx) || 0);
+      const heightPx = Math.max(0, Number(config.uiSignatureHeightPx) || 0);
+      if (!signatureDataUrl || !els.appFooterSignature || !els.appFooterSignatureWrap) {
+        return;
+      }
+
+      els.appFooterSignature.src = signatureDataUrl;
+      els.appFooterSignature.hidden = false;
+      els.appFooterSignatureWrap.hidden = false;
+      els.appFooterSignature.style.width = widthPx ? widthPx + 'px' : '';
+      els.appFooterSignature.style.height = heightPx ? heightPx + 'px' : '';
+      els.appFooterSignature.style.maxWidth = widthPx ? widthPx + 'px' : '';
+      els.appFooterSignature.style.maxHeight = heightPx ? heightPx + 'px' : '';
+    }
+
+    function getAvatarText(user) {
+      const rawInitials = String((user && user.initials) || '').trim();
+      if (rawInitials) {
+        const compact = rawInitials.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+        if (compact) {
+          return compact.slice(0, 2);
+        }
+      }
+
+      const name = String((user && user.displayName) || '').trim();
+      if (!name) {
+        return 'U';
+      }
+
+      const parts = name.split(/\s+/).filter(Boolean);
+      if (parts.length === 1) {
+        return parts[0].slice(0, 2).toUpperCase();
+      }
+
+      return parts
+        .slice(0, 2)
+        .map(function(part) {
+          return part.charAt(0).toUpperCase();
+        })
+        .join('');
+    }
+
+    function cacheDocumentDetail(detail) {
+      if (!detail || !detail.document || !detail.document.documentId) {
+        return;
+      }
+      state.documentDetailCache[detail.document.documentId] = detail;
+    }
+
+    function getCachedDocumentDetail(documentId) {
+      if (!documentId) {
+        return null;
+      }
+      return state.documentDetailCache[documentId] || null;
+    }
+
+    function clearCachedDocumentDetail(documentId) {
+      if (!documentId) {
+        return;
+      }
+      delete state.documentDetailCache[documentId];
+    }
+
+    function bindEvents() {
+      els.navButtons.forEach(function(button) {
+        button.addEventListener('click', function() {
+          switchView(button.dataset.view);
+        });
+      });
+
+      els.sidebarToggle.addEventListener('click', toggleSidebar);
+      els.sidebarBackdrop.addEventListener('click', closeSidebar);
+      els.newDocumentShortcut.addEventListener('click', function() {
+        resetDocumentForm();
+        switchView('generator');
+      });
+
+      els.documentForm.addEventListener('submit', handleSaveDocument);
+      els.addLineButton.addEventListener('click', handleAddLine);
+      els.resetFormButton.addEventListener('click', resetDocumentForm);
+      els.printDocumentButton.addEventListener('click', handlePrintCurrentDocument);
+      els.editFromPreviewButton.addEventListener('click', function() {
+        switchView('generator');
+      });
+      els.lineItemsBody.addEventListener('click', handleLineTableClick);
+      els.lineItemsBody.addEventListener('input', handleLineFieldInput);
+
+      els.archiveFilterButton.addEventListener('click', refreshArchive);
+      els.archiveSearch.addEventListener('input', debounce(refreshArchive, 180));
+      els.archiveStatus.addEventListener('change', refreshArchive);
+      els.archiveRegional.addEventListener('change', refreshArchive);
+      els.archiveClearButton.addEventListener('click', clearArchiveFilters);
+      els.exportArchiveButton.addEventListener('click', exportArchiveCsv);
+      els.archiveTableBody.addEventListener('click', handleArchiveTableClick);
+      els.dashboardRecent.addEventListener('click', handleDashboardRecentClick);
+
+      els.detailBackButton.addEventListener('click', function() {
+        switchView('archive');
+      });
+      els.detailEditButton.addEventListener('click', handleEditFromDetail);
+      els.detailPrintButton.addEventListener('click', handlePrintCurrentDocument);
+
+      if (els.userForm) {
+        els.userForm.addEventListener('submit', handleUserSave);
+      }
+      if (els.userResetButton) {
+        els.userResetButton.addEventListener('click', resetUserForm);
+      }
+      if (els.usersTableBody) {
+        els.usersTableBody.addEventListener('click', handleUsersTableClick);
+      }
+      if (els.regionalForm) {
+        els.regionalForm.addEventListener('submit', handleRegionalSave);
+      }
+      if (els.agreementForm) {
+        els.agreementForm.addEventListener('submit', handleAgreementSave);
+      }
+      if (els.prefixForm) {
+        els.prefixForm.addEventListener('submit', handlePrefixSave);
+      }
+      if (els.templateForm) {
+        els.templateForm.addEventListener('submit', handleTemplateSave);
+      }
+      if (els.templateSelect) {
+        els.templateSelect.addEventListener('change', syncSelectedTemplate);
+      }
+      if (els.auditFilterButton) {
+        els.auditFilterButton.addEventListener('click', refreshAudit);
+      }
+
+      els.modalConfirm.addEventListener('click', function() {
+        Modal.close(true);
+      });
+      els.modalCancel.addEventListener('click', function() {
+        Modal.close(false);
+      });
+      els.modalClose.addEventListener('click', function() {
+        Modal.close(false);
+      });
+    }
+
+    function applyRoleVisibility() {
+      const isAdmin = (state.boot.currentUser || {}).role === 'ADMIN';
+      document.querySelectorAll('.is-admin-only').forEach(function(element) {
+        element.hidden = !isAdmin;
+      });
+    }
+
+    function switchView(view) {
+      state.currentView = view;
+      els.viewTitle.textContent = viewTitles[view] || 'DocGen';
+      els.navButtons.forEach(function(button) {
+        button.classList.toggle('is-active', button.dataset.view === view);
+      });
+      els.viewPanels.forEach(function(panel) {
+        panel.classList.toggle('is-active', panel.dataset.viewPanel === view);
+      });
+      if (els.mainContent) {
+        els.mainContent.scrollTop = 0;
+      }
+      closeSidebar();
+    }
+
+    function toggleSidebar() {
+      const open = !els.sidebar.classList.contains('is-open');
+      els.sidebar.classList.toggle('is-open', open);
+      els.sidebarBackdrop.hidden = !open;
+    }
+
+    function closeSidebar() {
+      els.sidebar.classList.remove('is-open');
+      els.sidebarBackdrop.hidden = true;
+    }
+
+    function ensureBootShape(boot) {
+      const safeBoot = boot && typeof boot === 'object' ? boot : {};
+      safeBoot.app = safeBoot.app || {};
+      safeBoot.currentUser = safeBoot.currentUser || {};
+      safeBoot.config = safeBoot.config || {};
+      safeBoot.catalogs = safeBoot.catalogs || {};
+      safeBoot.dashboard = safeBoot.dashboard || {};
+      safeBoot.documents = Array.isArray(safeBoot.documents) ? safeBoot.documents : [];
+      safeBoot.audit = Array.isArray(safeBoot.audit) ? safeBoot.audit : [];
+      safeBoot.users = Array.isArray(safeBoot.users) ? safeBoot.users : [];
+      safeBoot.catalogs.regionals = Array.isArray(safeBoot.catalogs.regionals) ? safeBoot.catalogs.regionals : [];
+      safeBoot.catalogs.prefixes = Array.isArray(safeBoot.catalogs.prefixes) ? safeBoot.catalogs.prefixes : [];
+      safeBoot.catalogs.agreementTypes = Array.isArray(safeBoot.catalogs.agreementTypes) ? safeBoot.catalogs.agreementTypes : [];
+      safeBoot.catalogs.templates = Array.isArray(safeBoot.catalogs.templates) ? safeBoot.catalogs.templates : [];
+      return safeBoot;
+    }
+
+    function expectObjectResponse(response, action, requiredKey) {
+      if (!response || typeof response !== 'object') {
+        throw new Error('El servidor devolvio una respuesta vacia al ' + action + '.');
+      }
+      if (requiredKey && !response[requiredKey]) {
+        throw new Error('La respuesta del servidor no incluyo ' + requiredKey + ' en ' + action + '.');
+      }
+      return response;
+    }
+
+    function expectArrayResponse(response, action) {
+      if (!Array.isArray(response)) {
+        throw new Error('El servidor devolvio una respuesta invalida al ' + action + '.');
+      }
+      return response;
+    }
+
+    function debounce(callback, wait) {
+      let timerId = 0;
+      return function debouncedHandler() {
+        const args = arguments;
+        clearTimeout(timerId);
+        timerId = window.setTimeout(function() {
+          callback.apply(null, args);
+        }, wait);
+      };
+    }
+
+    function splitSummaryValues(summary) {
+      return String(summary || '')
+        .split('|')
+        .map(function(item) {
+          return item.trim();
+        })
+        .filter(Boolean);
+    }
+
+    function renderSummaryPills(summary, emptyLabel) {
+      const items = Array.isArray(summary) ? summary : splitSummaryValues(summary);
+      if (!items.length) {
+        return '<span class="summary-pill is-muted">' + escapeHtml(emptyLabel || 'Sin datos') + '</span>';
+      }
+      return '<div class="summary-stack">' + items.map(function(item) {
+        return '<span class="summary-pill">' + escapeHtml(item) + '</span>';
+      }).join('') + '</div>';
+    }
+
+    function getArchiveFilters() {
+      return {
+        search: String((els.archiveSearch && els.archiveSearch.value) || '').trim().toLowerCase(),
+        status: String((els.archiveStatus && els.archiveStatus.value) || '').trim().toUpperCase(),
+        regional: String((els.archiveRegional && els.archiveRegional.value) || '').trim().toUpperCase()
+      };
+    }
+
+    function getFilteredArchiveDocuments() {
+      const filters = getArchiveFilters();
+      const rows = Array.isArray(state.boot.documents) ? state.boot.documents : [];
+      return rows.filter(function(document) {
+        if (filters.status && String(document.status || '').toUpperCase() !== filters.status) {
+          return false;
+        }
+        if (filters.regional && String(document.regionalAbreviatura || '').toUpperCase() !== filters.regional) {
+          return false;
+        }
+        if (!filters.search) {
+          return true;
+        }
+        const haystack = [
+          document.documentId,
+          document.status,
+          document.regionalAbreviatura,
+          document.regionalNombre,
+          document.ceafSummary,
+          document.centroSummary,
+          document.numeracionSummary,
+          document.ownerName
+        ].join(' ').toLowerCase();
+        return haystack.indexOf(filters.search) !== -1;
+      });
+    }
+
+    function renderAll() {
+      state.boot = ensureBootShape(state.boot);
+      populateCatalogSelectors();
+      renderDashboard();
+      renderArchiveTable(getFilteredArchiveDocuments());
+      renderUsersTable();
+      renderCatalogLists();
+      renderAuditTable(state.boot.audit || []);
+      resetDocumentForm();
+      resetUserForm();
+    }
+
+    function populateCatalogSelectors() {
+      const regionals = (((state.boot || {}).catalogs || {}).regionals || []);
+      const prefixes = (((state.boot || {}).catalogs || {}).prefixes || []);
+      const agreements = (((state.boot || {}).catalogs || {}).agreementTypes || []);
+
+      const regionalOptions = ['<option value="">Selecciona una regional</option>'].concat(regionals.map(function(item) {
+        return '<option value="' + escapeHtml(item.abreviatura) + '">' + escapeHtml(item.abreviatura + ' - ' + item.regional) + '</option>';
+      }));
+      els.regionalSelect.innerHTML = regionalOptions.join('');
+
+      const archiveRegionalOptions = ['<option value="">Todas</option>'].concat(regionals.map(function(item) {
+        return '<option value="' + escapeHtml(item.abreviatura) + '">' + escapeHtml(item.abreviatura) + '</option>';
+      }));
+      els.archiveRegional.innerHTML = archiveRegionalOptions.join('');
+
+      els.lineItemsBody.dataset.prefixOptions = prefixes.map(function(item) {
+        return '<option value="' + escapeHtml(item.codigo) + '">' + escapeHtml(item.codigo) + '</option>';
+      }).join('');
+      els.lineItemsBody.dataset.agreementOptions = agreements.map(function(item) {
+        return '<option value="' + escapeHtml(item.tipoConvenio) + '">' + escapeHtml(item.tipoConvenio) + '</option>';
+      }).join('');
+
+      if (els.templateSelect) {
+        els.templateSelect.innerHTML = ((state.boot.catalogs || {}).templates || []).map(function(item) {
+          return '<option value="' + escapeHtml(item.templateKey) + '">' + escapeHtml(item.templateName) + '</option>';
+        }).join('');
+        if (els.templateSelect.value) {
+          syncSelectedTemplate();
+        }
+      }
+    }
+
+    function renderDashboard() {
+      const dashboard = state.boot.dashboard || {};
+      const metrics = [
+        { label: 'Documentos activos', value: dashboard.totalActive || 0 },
+        { label: 'Documentos anulados', value: dashboard.totalArchived || 0 },
+        { label: 'Creados hoy', value: dashboard.createdToday || 0 },
+        { label: 'Impresiones registradas', value: dashboard.printedLast7Days || 0 }
+      ];
+
+      els.dashboardMetrics.innerHTML = metrics.map(function(metric) {
+        return '<article class="metric-card"><p>' + escapeHtml(metric.label) + '</p><h4>' + escapeHtml(metric.value) + '</h4></article>';
+      }).join('');
+
+      const recent = dashboard.recentDocuments || [];
+      els.dashboardRecent.innerHTML = recent.length ? recent.map(function(document) {
+        return renderDocumentListItem(document);
+      }).join('') : '<div class="empty-state">Aún no hay documentos registrados.</div>';
+
+      const byRegional = dashboard.byRegional || [];
+      els.dashboardRegional.innerHTML = byRegional.length ? byRegional.map(function(item) {
+        return '<div class="list-item"><h5>' + escapeHtml(item.regional) + '</h5><p>' + escapeHtml(item.total) + ' documentos activos</p></div>';
+      }).join('') : '<div class="empty-state">Sin datos suficientes para agrupar por regional.</div>';
+    }
+
+    function renderDocumentListItem(document) {
+      return '<button class="list-item card-button" data-archive-action="view" data-document-id="' + escapeHtml(document.documentId) + '">' +
+        '<h5>' + escapeHtml(document.documentId) + '</h5>' +
+        '<p>' + escapeHtml(document.regionalNombre || document.regionalAbreviatura) + '</p>' +
+        '<p>' + escapeHtml(document.numeracionSummary || 'Sin numeraciones') + '</p>' +
+      '</button>';
+    }
+
+    function createEmptyLine() {
+      const prefixes = (state.boot.catalogs || {}).prefixes || [];
+      const firstPrefix = prefixes.length ? prefixes[0].codigo : 'BS';
+      return {
+        ceaf: '',
+        tipoConvenio: '',
+        centro: '',
+        certPrefix: firstPrefix,
+        numeracion: '',
+        fechaCertificacion: getTodayDate()
+      };
+    }
+
+    function getTodayDate() {
+      return new Date().toISOString().slice(0, 10);
+    }
+
+    function getMinAllowedDate() {
+      const lookback = Number((state.boot.config || {}).certDateLookbackDays || 31);
+      const date = new Date();
+      date.setDate(date.getDate() - lookback);
+      return date.toISOString().slice(0, 10);
+    }
+
+    function renderLineItems(lines) {
+      const prefixOptions = els.lineItemsBody.dataset.prefixOptions || '';
+      const agreementOptions = els.lineItemsBody.dataset.agreementOptions || '';
+      const maxLines = Number((state.boot.config || {}).maxCeafPerDocument || 3);
+      els.addLineButton.disabled = lines.length >= maxLines;
+      els.lineItemsBody.innerHTML = lines.map(function(line, index) {
+        return '<tr data-line-index="' + index + '">' +
+          '<td><input data-field="ceaf" maxlength="3" pattern="\\d{3}" value="' + escapeHtml(line.ceaf || '') + '" placeholder="123"></td>' +
+          '<td><select data-field="tipoConvenio"><option value="">Seleccione</option>' + agreementOptions.replace(/value="([^"]+)"/g, function(match, value) {
+            return 'value="' + value + '"' + (value === line.tipoConvenio ? ' selected' : '');
+          }) + '</select></td>' +
+          '<td><input data-field="centro" value="' + escapeHtml(line.centro || '') + '" placeholder="Centro"></td>' +
+          '<td><select data-field="certPrefix">' + prefixOptions.replace(/value="([^"]+)"/g, function(match, value) {
+            return 'value="' + value + '"' + (value === line.certPrefix ? ' selected' : '');
+          }) + '</select></td>' +
+          '<td><input data-field="numeracion" maxlength="7" pattern="\\d{7}" value="' + escapeHtml(line.numeracion || '') + '" placeholder="1234567"></td>' +
+          '<td><input data-field="fechaCertificacion" type="date" min="' + getMinAllowedDate() + '" max="' + getTodayDate() + '" value="' + escapeHtml(line.fechaCertificacion || '') + '"></td>' +
+          '<td><button class="icon-button" data-line-action="remove" type="button" aria-label="Eliminar línea"><span class="material-symbols-outlined">delete</span></button></td>' +
+        '</tr>';
+      }).join('');
+    }
+
+    function resetDocumentForm() {
+      state.currentDocument = null;
+      state.currentDetail = null;
+      els.documentId.value = '';
+      els.documentNotes.value = '';
+      els.regionalSelect.value = '';
+      els.generatorTitle.textContent = 'Generador de oficios';
+      renderLineItems([createEmptyLine()]);
+      renderPreview(null, null);
+      els.documentType.value = 'Oficio de remisión CEAF';
+    }
+
+    function handleAddLine() {
+      const payload = collectDocumentForm();
+      payload.lines.push(createEmptyLine());
+      renderLineItems(payload.lines);
+    }
+
+    function handleLineTableClick(event) {
+      const button = event.target.closest('[data-line-action="remove"]');
+      if (!button) {
+        return;
+      }
+      const current = collectDocumentForm();
+      if (current.lines.length === 1) {
+        Modal.alert('Límite mínimo', 'El documento debe mantener al menos una línea CEAF.');
+        return;
+      }
+      const row = button.closest('tr');
+      const index = Number(row.dataset.lineIndex);
+      current.lines.splice(index, 1);
+      renderLineItems(current.lines);
+    }
+
+    function handleLineFieldInput(event) {
+      const input = event.target.closest('input[data-field]');
+      if (!input) {
+        return;
+      }
+      if (input.dataset.field === 'ceaf') {
+        input.value = input.value.replace(/\D/g, '').slice(0, 3);
+      }
+      if (input.dataset.field === 'numeracion') {
+        input.value = input.value.replace(/\D/g, '').slice(0, 7);
+      }
+    }
+
+    function populateEditorFromDetail(detail) {
+      state.currentDetail = detail;
+      state.currentDocument = detail.document;
+      els.documentId.value = detail.document.documentId;
+      els.regionalSelect.value = detail.document.regionalAbreviatura || '';
+      els.documentNotes.value = detail.document.notes || '';
+      els.generatorTitle.textContent = 'Editando ' + detail.document.documentId;
+      renderLineItems(Array.isArray(detail.lines) && detail.lines.length ? detail.lines : [createEmptyLine()]);
+      renderPreview(detail.previewHtml, detail.document);
+      switchView('generator');
+    }
+
+    function collectDocumentForm() {
+      const lines = Array.from(els.lineItemsBody.querySelectorAll('tr')).map(function(row) {
+        return {
+          ceaf: row.querySelector('[data-field="ceaf"]').value.trim(),
+          tipoConvenio: row.querySelector('[data-field="tipoConvenio"]').value.trim(),
+          centro: row.querySelector('[data-field="centro"]').value.trim(),
+          certPrefix: row.querySelector('[data-field="certPrefix"]').value.trim(),
+          numeracion: row.querySelector('[data-field="numeracion"]').value.trim(),
+          fechaCertificacion: row.querySelector('[data-field="fechaCertificacion"]').value
+        };
+      });
+
+      return {
+        documentId: els.documentId.value.trim(),
+        regionalAbreviatura: els.regionalSelect.value.trim(),
+        notes: els.documentNotes.value.trim(),
+        lines: lines
+      };
+    }
+
+    function validateClientDocument(payload) {
+      const maxLines = Number((state.boot.config || {}).maxCeafPerDocument || 3);
+      const minAllowedDate = getMinAllowedDate();
+      const maxAllowedDate = getTodayDate();
+
+      if (!payload.regionalAbreviatura) {
+        throw new Error('Selecciona una regional antes de guardar el oficio.');
+      }
+      if (!payload.lines.length) {
+        throw new Error('Agrega al menos una línea CEAF.');
+      }
+      if (payload.lines.length > maxLines) {
+        throw new Error('No se permiten más de ' + maxLines + ' líneas por oficio.');
+      }
+      const seen = {};
+      payload.lines.forEach(function(line, index) {
+        if (!/^\d{3}$/.test(line.ceaf)) {
+          throw new Error('La línea ' + (index + 1) + ' debe tener un CEAF de 3 dígitos.');
+        }
+        if (!line.tipoConvenio || !line.centro || !line.certPrefix) {
+          throw new Error('La línea ' + (index + 1) + ' está incompleta.');
+        }
+        if (!/^\d{7}$/.test(line.numeracion)) {
+          throw new Error('La línea ' + (index + 1) + ' debe tener una numeración de 7 dígitos.');
+        }
+        if (!line.fechaCertificacion) {
+          throw new Error('La línea ' + (index + 1) + ' debe tener fecha de certificación.');
+        }
+        if (line.fechaCertificacion < minAllowedDate || line.fechaCertificacion > maxAllowedDate) {
+          throw new Error('La línea ' + (index + 1) + ' tiene una fecha de certificación fuera de la ventana permitida.');
+        }
+        if (seen[line.numeracion]) {
+          throw new Error('Las numeraciones no pueden repetirse dentro del mismo documento.');
+        }
+        seen[line.numeracion] = true;
+      });
+    }
+
+    async function handleSaveDocument(event) {
+      event.preventDefault();
+      try {
+        const payload = collectDocumentForm();
+        validateClientDocument(payload);
+        const result = await runServer('apiSaveDocument', payload, 'Guardando oficio...');
+        state.currentDocument = result.document;
+        els.documentId.value = result.document.documentId;
+        els.generatorTitle.textContent = 'Editando ' + result.document.documentId;
+        renderPreview(result.previewHtml, result.document);
+        await refreshBootstrapData();
+        Modal.alert('Documento guardado', escapeHtml(result.message));
+      } catch (error) {
+        Modal.alert('No fue posible guardar', escapeHtml(normalizeError(error)));
+      }
+    }
+
+    function renderPreview(html, document) {
+      els.previewContainer.innerHTML = html ? '<div class="preview-sheet">' + html + '</div>' : '';
+      if (document) {
+        els.previewMeta.classList.remove('empty-state');
+        els.previewMeta.innerHTML = '<strong>' + escapeHtml(document.documentId) + '</strong><br><span>' + escapeHtml(document.regionalNombre || document.regionalAbreviatura) + '</span>';
+        els.printDocumentButton.disabled = false;
+        els.editFromPreviewButton.disabled = false;
+      } else {
+        els.previewMeta.classList.add('empty-state');
+        els.previewMeta.textContent = 'Guarda el oficio para ver aquí la plantilla oficial renderizada.';
+        els.printDocumentButton.disabled = true;
+        els.editFromPreviewButton.disabled = true;
+      }
+    }
+
+    function renderArchiveTable(documents) {
+      els.archiveTableBody.innerHTML = documents.length ? documents.map(function(document) {
+        const statusClass = document.status === 'ACTIVO' ? 'badge badge-active' : 'badge badge-archived';
+        return '<tr>' +
+          '<td><strong>' + escapeHtml(document.documentId) + '</strong></td>' +
+          '<td><span class="' + statusClass + '">' + escapeHtml(document.status) + '</span></td>' +
+          '<td>' + escapeHtml(document.regionalAbreviatura) + '</td>' +
+          '<td>' + escapeHtml(document.ceafSummary || '') + '</td>' +
+          '<td>' + escapeHtml(document.centroSummary || '') + '</td>' +
+          '<td>' + escapeHtml(document.numeracionSummary || '') + '</td>' +
+          '<td>' + escapeHtml(document.updatedAt || '') + '</td>' +
+          '<td><div class="button-row compact">' +
+            '<button class="button button-secondary" data-archive-action="view" data-document-id="' + escapeHtml(document.documentId) + '" type="button">Ver</button>' +
+            '<button class="button button-secondary" data-archive-action="edit" data-document-id="' + escapeHtml(document.documentId) + '" type="button">Editar</button>' +
+            '<button class="button button-accent" data-archive-action="print" data-document-id="' + escapeHtml(document.documentId) + '" type="button">Imprimir</button>' +
+            '<button class="button button-secondary" data-archive-action="duplicate" data-document-id="' + escapeHtml(document.documentId) + '" type="button">Duplicar</button>' +
+            '<button class="button button-secondary" data-archive-action="archive" data-document-id="' + escapeHtml(document.documentId) + '" type="button">Anular</button>' +
+          '</div></td>' +
+        '</tr>';
+      }).join('') : '<tr><td colspan="8" class="empty-state">No se encontraron documentos con los filtros actuales.</td></tr>';
+    }
+
+    async function refreshArchive() {
+      try {
+        const filters = {
+          search: els.archiveSearch.value.trim(),
+          status: els.archiveStatus.value,
+          regional: els.archiveRegional.value
+        };
+        const documents = await runServer('apiListDocuments', filters, 'Consultando historial...');
+        state.boot.documents = documents;
+        renderArchiveTable(documents);
+      } catch (error) {
+        Modal.alert('Error consultando historial', escapeHtml(normalizeError(error)));
+      }
+    }
+
+    function clearArchiveFilters() {
+      els.archiveSearch.value = '';
+      els.archiveStatus.value = '';
+      els.archiveRegional.value = '';
+      refreshArchive();
+    }
+
+    function handleArchiveTableClick(event) {
+      const button = event.target.closest('[data-archive-action]');
+      if (!button) {
+        return;
+      }
+      const action = button.dataset.archiveAction;
+      const documentId = button.dataset.documentId;
+      if (action === 'view') {
+        loadDocumentDetail(documentId);
+      } else if (action === 'edit') {
+        editDocument(documentId);
+      } else if (action === 'print') {
+        openPrintWindow(documentId);
+      } else if (action === 'duplicate') {
+        duplicateDocument(documentId);
+      } else if (action === 'archive') {
+        archiveDocument(documentId);
+      }
+    }
+
+    function handleDashboardRecentClick(event) {
+      const button = event.target.closest('[data-archive-action="view"]');
+      if (!button) {
+        return;
+      }
+      loadDocumentDetail(button.dataset.documentId);
+    }
+
+    async function loadDocumentDetail(documentId) {
+      try {
+        const detail = await runServer('apiGetDocumentDetail', documentId, 'Cargando detalle del documento...');
+        state.currentDetail = detail;
+        state.currentDocument = detail.document;
+        renderDetail(detail);
+        switchView('detail');
+      } catch (error) {
+        Modal.alert('No fue posible abrir el documento', escapeHtml(normalizeError(error)));
+      }
+    }
+
+    function renderDetail(detail) {
+      cacheDocumentDetail(detail);
+      els.detailSubtitle.textContent = detail.document.documentId + ' | ' + (detail.document.regionalNombre || detail.document.regionalAbreviatura);
+      els.detailSummary.classList.remove('empty-state');
+      els.detailSummary.innerHTML = [
+        createDetailCell('Documento', detail.document.documentId),
+        createDetailCell('Estado', detail.document.status),
+        createDetailCell('Regional', detail.document.regionalNombre || detail.document.regionalAbreviatura),
+        createDetailCell('Creado por', detail.document.createdByName || detail.document.ownerName),
+        createDetailCell('Creado el', detail.document.createdAt),
+        createDetailCell('Actualizado el', detail.document.updatedAt),
+        createDetailCell('Notas', detail.document.notes || 'Sin notas'),
+        createDetailCell('Última impresión', detail.document.lastPrintedAt || 'Sin registros')
+      ].join('');
+
+      els.detailLinesList.classList.toggle('empty-state', !detail.lines.length);
+      els.detailLinesList.innerHTML = detail.lines.length ? detail.lines.map(function(line, index) {
+        const documentYear = detail.document.documentYear || new Date().getFullYear();
+        const cert = line.certPrefix + '-' + line.numeracion + '-' + documentYear + ' | ' + line.fechaCertificacion;
+        return '<article class="detail-line-card">' +
+          '<div class="detail-line-header">' +
+            '<span class="detail-line-chip">Línea ' + (index + 1) + '</span>' +
+            '<p>CEAF activo y certificación asociada.</p>' +
+          '</div>' +
+          '<div class="detail-line-grid">' +
+            '<dl><dt>CEAF</dt><dd>' + escapeHtml(line.ceaf) + '</dd></dl>' +
+            '<dl><dt>Convenio</dt><dd>' + escapeHtml(line.tipoConvenio) + '</dd></dl>' +
+            '<dl><dt>Centro</dt><dd>' + escapeHtml(line.centro) + '</dd></dl>' +
+            '<dl><dt>Certificación</dt><dd>' + escapeHtml(cert) + '</dd></dl>' +
+          '</div>' +
+        '</article>';
+      }).join('') : '<div class="empty-state">Sin líneas activas.</div>';
+
+      els.detailAudit.classList.toggle('empty-state', !detail.auditEntries.length);
+      els.detailAudit.innerHTML = detail.auditEntries.length ? detail.auditEntries.map(function(entry) {
+        return '<div class="list-item"><h5>' + escapeHtml(entry.action) + '</h5><p>' + escapeHtml(entry.summary || '') + '</p><p>' + escapeHtml(entry.actorName + ' | ' + entry.timestamp) + '</p></div>';
+      }).join('') : '<div class="empty-state">Aún no hay eventos para mostrar.</div>';
+
+      els.detailPreview.innerHTML = detail.previewHtml ? '<div class="preview-sheet">' + detail.previewHtml + '</div>' : '<div class="empty-state">Sin vista previa.</div>';
+      els.detailEditButton.disabled = false;
+      els.detailPrintButton.disabled = false;
+    }
+
+    function createDetailCell(label, value) {
+      return '<dl><dt>' + escapeHtml(label) + '</dt><dd>' + escapeHtml(value || '') + '</dd></dl>';
+    }
+
+    async function editDocument(documentId) {
+      try {
+        const detail = await runServer('apiGetDocumentDetail', documentId, 'Cargando documento para edición...');
+        state.currentDetail = detail;
+        state.currentDocument = detail.document;
+        els.documentId.value = detail.document.documentId;
+        els.regionalSelect.value = detail.document.regionalAbreviatura || '';
+        els.documentNotes.value = detail.document.notes || '';
+        els.generatorTitle.textContent = 'Editando ' + detail.document.documentId;
+        renderLineItems(detail.lines);
+        renderPreview(detail.previewHtml, detail.document);
+        switchView('generator');
+      } catch (error) {
+        Modal.alert('No fue posible cargar la edición', escapeHtml(normalizeError(error)));
+      }
+    }
+
+    function handleEditFromDetail() {
+      if (!state.currentDetail) {
+        return;
+      }
+      cacheDocumentDetail(state.currentDetail);
+      populateEditorFromDetail(state.currentDetail);
+    }
+
+    async function duplicateDocument(documentId) {
+      try {
+        const duplicate = await runServer('apiPrepareDuplicate', documentId, 'Preparando duplicado...');
+        resetDocumentForm();
+        els.regionalSelect.value = duplicate.regionalAbreviatura || '';
+        els.documentNotes.value = duplicate.notes || '';
+        renderLineItems(duplicate.lines || [createEmptyLine()]);
+        switchView('generator');
+      } catch (error) {
+        Modal.alert('No fue posible duplicar', escapeHtml(normalizeError(error)));
+      }
+    }
+
+    async function archiveDocument(documentId) {
+      const confirmed = await Modal.confirm('Anular documento', 'El documento quedará con estado ANULADO y sus numeraciones volverán a estar disponibles para nuevos registros.', 'Anular');
+      if (!confirmed) {
+        return;
+      }
+      try {
+        await runServer('apiArchiveDocuments', [documentId], 'Anulando documento...');
+        clearCachedDocumentDetail(documentId);
+        await refreshBootstrapData();
+      } catch (error) {
+        Modal.alert('No fue posible anular', escapeHtml(normalizeError(error)));
+      }
+    }
+
+    async function openPrintWindow(documentId) {
+      const popup = window.open('', '_blank');
+      if (!popup) {
+        Modal.alert('No fue posible abrir la impresion', 'Tu navegador bloqueo la ventana emergente. Permite popups para esta web app e intenta de nuevo.');
+        return;
+      }
+
+      popup.document.open();
+      popup.document.write(buildPrintLoadingHtml(documentId));
+      popup.document.close();
+
+      try {
+        const detail = await resolvePrintDetail(documentId);
+        popup.document.open();
+        popup.document.write(buildPrintWindowHtml(detail, Boolean((state.boot.config || {}).printAutoOpen)));
+        popup.document.close();
+      } catch (error) {
+        const message = normalizeError(error);
+        popup.document.open();
+        popup.document.write(buildPrintErrorHtml(documentId, message));
+        popup.document.close();
+        Modal.alert('No fue posible abrir la impresion', escapeHtml(message));
+      }
+    }
+
+    function handlePrintCurrentDocument() {
+      const documentId = state.currentDocument && state.currentDocument.documentId;
+      if (!documentId) {
+        return;
+      }
+      openPrintWindow(documentId);
+    }
+
+    async function resolvePrintDetail(documentId) {
+      if (
+        state.currentDetail &&
+        state.currentDetail.document &&
+        state.currentDetail.document.documentId === documentId &&
+        state.currentDetail.previewHtml
+      ) {
+        return state.currentDetail;
+      }
+
+      if (
+        state.currentDocument &&
+        state.currentDocument.documentId === documentId &&
+        els.previewContainer &&
+        els.previewContainer.innerHTML
+      ) {
+        return {
+          document: state.currentDocument,
+          lines: [],
+          previewHtml: els.previewContainer.innerHTML,
+          auditEntries: []
+        };
+      }
+
+      const cached = getCachedDocumentDetail(documentId);
+      if (cached && cached.previewHtml) {
+        state.currentDetail = cached;
+        state.currentDocument = cached.document;
+        return cached;
+      }
+
+      const detail = expectObjectResponse(
+        await runServer('apiGetDocumentDetail', documentId, 'Preparando vista de impresion...'),
+        'preparar la vista de impresion',
+        'document'
+      );
+      state.currentDetail = detail;
+      state.currentDocument = detail.document;
+      cacheDocumentDetail(detail);
+      return detail;
+    }
+
+    function buildPrintLoadingHtml(documentId) {
+      return '<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><title>Oficio Generado</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#f2f5fa;color:#0b1c30;font-family:Arial,sans-serif}.loader{display:grid;gap:16px;justify-items:center;padding:32px}.spinner{width:54px;height:54px;border-radius:50%;border:4px solid #d8e2f0;border-top-color:#f37021;animation:spin .8s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}p{margin:0;font-size:16px;color:#53627a}</style></head><body><div class="loader"><div class="spinner"></div><p>Preparando vista imprimible de ' + escapeHtml(documentId) + '...</p></div></body></html>';
+    }
+
+    function buildPrintErrorHtml(documentId, message) {
+      return '<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><title>Oficio Generado</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#f2f5fa;color:#0b1c30;font-family:Arial,sans-serif}.card{width:min(92vw,560px);padding:28px;border-radius:18px;border:1px solid #d8e2f0;background:#fff;box-shadow:0 16px 36px rgba(20,40,80,.14)}h1{margin:0 0 12px;font-size:28px}p{margin:0;color:#53627a;line-height:1.55}</style></head><body><div class="card"><h1>No fue posible abrir la impresion</h1><p>' + escapeHtml(message) + '</p></div></body></html>';
+    }
+
+    function normalizePrintPreviewHtml(previewHtml) {
+      const html = String(previewHtml || '').trim();
+      if (!html) {
+        return '<div class="empty-state">No hay contenido imprimible disponible.</div>';
+      }
+      return /class=["']preview-sheet["']/.test(html) ? html : '<div class="preview-sheet">' + html + '</div>';
+    }
+
+    function buildPrintWindowHtml(detail, printAutoOpen) {
+      const documentInfo = detail && detail.document ? detail.document : {};
+      const documentId = documentInfo.documentId || 'Documento';
+      const previewHtml = normalizePrintPreviewHtml(detail && detail.previewHtml);
+      return `<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta http-equiv="Cache-Control" content="no-store, max-age=0, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Oficio Generado</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <style>
+      @page {
+        margin: 1cm;
+        size: A4 portrait;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 50px;
+        background: #f2f5fa;
+        color: #000;
+        font-family: INFOTEXT, Arial, sans-serif;
+      }
+
+      .toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 14px 18px;
+        border: 1px solid #d7e0ec;
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.96);
+        position: sticky;
+        top: 16px;
+        z-index: 10;
+        margin: 0 auto 18px;
+        max-width: 980px;
+      }
+
+      .toolbar h1,
+      .toolbar p {
+        margin: 0;
+      }
+
+      .toolbar p {
+        color: #5e6a7d;
+        line-height: 1.45;
+      }
+
+      .toolbar-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      .button {
+        min-height: 42px;
+        padding: 0 16px;
+        border-radius: 10px;
+        border: 0;
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      .button-primary {
+        background: #f37021;
+        color: #fff;
+      }
+
+      .button-secondary {
+        background: #fff;
+        color: #0b1c30;
+        border: 1px solid #d7e0ec;
+      }
+
+      .document-shell {
+        margin: 0 auto;
+        width: min(100%, 980px);
+        background: #fff;
+        border: 1px solid #d7e0ec;
+        box-shadow: 0 12px 28px rgba(20, 40, 80, 0.12);
+        padding: 0;
+      }
+
+      .preview-sheet {
+        width: 100%;
+      }
+
+      .preview-sheet .content {
+        margin: 0 auto;
+        width: 88%;
+      }
+
+      .preview-sheet table {
+        margin: 0 auto;
+      }
+
+      .fa-sketch-icon {
+        position: fixed;
+        bottom: 60px;
+        right: 10px;
+        font-size: 10px;
+        color: #000;
+        z-index: 1000;
+      }
+
+      .empty-state {
+        padding: 48px;
+        color: #5e6a7d;
+        font-style: italic;
+      }
+
+      @media (max-width: 900px) {
+        body {
+          margin: 18px;
+        }
+
+        .toolbar {
+          position: static;
+          flex-direction: column;
+          align-items: stretch;
+        }
+      }
+
+      @media print {
+        body {
+          margin: 50px;
+          padding: 0;
+          background: #fff;
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }
+
+        .toolbar {
+          display: none !important;
+        }
+
+        .document-shell {
+          width: 100%;
+          border: 0;
+          box-shadow: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="toolbar">
+      <div>
+        <h1>${escapeHtml(documentId)}</h1>
+        <p>Documento institucional listo para impresion o exportacion PDF.</p>
+      </div>
+      <div class="toolbar-actions">
+        <button id="printNowButton" class="button button-primary" type="button">Imprimir ahora</button>
+        <button id="closePrintButton" class="button button-secondary" type="button">Volver</button>
+      </div>
+    </div>
+
+    <div class="document-shell">
+      ${previewHtml}
+    </div>
+
+    <i class="fa-brands fa-sketch fa-sketch-icon"></i>
+
+    <script>
+      (function() {
+        const documentId = ${JSON.stringify(documentId)};
+        const printAutoOpen = ${printAutoOpen ? 'true' : 'false'};
+        const printButton = document.getElementById('printNowButton');
+        const closeButton = document.getElementById('closePrintButton');
+        let printRegistered = false;
+
+        function markPrinted() {
+          if (window.opener && typeof window.opener.__docgenMarkPrinted === 'function') {
+            return window.opener.__docgenMarkPrinted(documentId);
+          }
+          return Promise.resolve();
+        }
+
+        function registerPrintedOnce() {
+          if (printRegistered) {
+            return;
+          }
+          printRegistered = true;
+          markPrinted().catch(function() {});
+        }
+
+        function releasePrintButton() {
+          printButton.disabled = false;
+        }
+
+        function printNow() {
+          if (printButton.disabled) {
+            return;
+          }
+          printButton.disabled = true;
+          window.setTimeout(function() {
+            window.print();
+          }, 20);
+        }
+
+        printButton.addEventListener('click', printNow);
+        closeButton.addEventListener('click', function() {
+          window.close();
+        });
+
+        window.addEventListener('afterprint', function() {
+          releasePrintButton();
+          registerPrintedOnce();
+        });
+
+        if (printAutoOpen) {
+          window.addEventListener('load', function() {
+            setTimeout(printNow, 120);
+          });
+        }
+      })();
+    <\/script>
+  </body>
+</html>`;
+    }
+
+    window.__docgenMarkPrinted = function(documentId) {
+      return runServerSilently('apiMarkPrinted', documentId)
+        .then(function(response) {
+          return refreshBootstrapData({ silent: true })
+            .catch(function() {})
+            .then(function() {
+              return response;
+            });
+        });
+    };
+
+    function renderUsersTable() {
+      if (!els.usersTableBody) {
+        return;
+      }
+      const rows = state.boot.users || [];
+      els.usersTableBody.innerHTML = rows.length ? rows.map(function(user) {
+        return '<tr><td>' + escapeHtml(user.email) + '</td><td>' + escapeHtml(user.displayName) + '</td><td>' + escapeHtml(user.role) + '</td><td>' + escapeHtml(user.status) + '</td><td>' + escapeHtml(user.department || '') + '</td></tr>';
+      }).join('') : '<tr><td colspan="5" class="empty-state">No hay usuarios cargados.</td></tr>';
+    }
+
+    async function handleUserSave(event) {
+      event.preventDefault();
+      try {
+        await runServer('apiSaveUserAccess', {
+          email: els.userEmail.value.trim(),
+          displayName: els.userDisplayName.value.trim(),
+          role: els.userRoleInput.value,
+          status: els.userStatus.value,
+          department: els.userDepartment.value.trim(),
+          notes: els.userNotes.value.trim()
+        }, 'Guardando usuario...');
+        els.userForm.reset();
+        await refreshAdminData();
+      } catch (error) {
+        Modal.alert('No fue posible guardar el usuario', escapeHtml(normalizeError(error)));
+      }
+    }
+
+    function renderCatalogLists() {
+      if (!els.regionalList) {
+        return;
+      }
+
+      const regionals = ((state.boot.catalogs || {}).regionals || []);
+      const agreements = ((state.boot.catalogs || {}).agreementTypes || []);
+      const prefixes = ((state.boot.catalogs || {}).prefixes || []);
+
+      els.regionalList.innerHTML = regionals.length ? regionals.map(function(item) {
+        return '<div class="list-item"><h5>' + escapeHtml(item.abreviatura + ' - ' + item.regional) + '</h5><p>' + escapeHtml(item.director || '') + '</p></div>';
+      }).join('') : '<div class="empty-state">Sin regionales.</div>';
+
+      els.agreementList.innerHTML = agreements.length ? agreements.map(function(item) {
+        return '<div class="list-item"><h5>' + escapeHtml(item.tipoConvenio) + '</h5></div>';
+      }).join('') : '<div class="empty-state">Sin convenios.</div>';
+
+      els.prefixList.innerHTML = prefixes.length ? prefixes.map(function(item) {
+        return '<div class="list-item"><h5>' + escapeHtml(item.codigo) + '</h5><p>' + escapeHtml(item.descripcion || '') + '</p></div>';
+      }).join('') : '<div class="empty-state">Sin prefijos.</div>';
+    }
+
+    async function handleRegionalSave(event) {
+      event.preventDefault();
+      try {
+        await runServer('apiSaveCatalogItem', {
+          collection: 'regionales',
+          regionalId: els.regionalId.value.trim(),
+          abreviatura: els.regionalAbbr.value.trim(),
+          regional: els.regionalName.value.trim(),
+          director: els.regionalDirector.value.trim(),
+          sexo: els.regionalSexo.value,
+          cargo: els.regionalCargo.value.trim()
+        }, 'Guardando regional...');
+        els.regionalForm.reset();
+        await refreshAdminData();
+      } catch (error) {
+        Modal.alert('No fue posible guardar la regional', escapeHtml(normalizeError(error)));
+      }
+    }
+
+    async function handleAgreementSave(event) {
+      event.preventDefault();
+      try {
+        await runServer('apiSaveCatalogItem', {
+          collection: 'tiposConvenio',
+          convenioId: els.agreementId.value.trim(),
+          tipoConvenio: els.agreementName.value.trim()
+        }, 'Guardando convenio...');
+        els.agreementForm.reset();
+        await refreshAdminData();
+      } catch (error) {
+        Modal.alert('No fue posible guardar el convenio', escapeHtml(normalizeError(error)));
+      }
+    }
+
+    async function handlePrefixSave(event) {
+      event.preventDefault();
+      try {
+        await runServer('apiSaveCatalogItem', {
+          collection: 'prefijos',
+          prefixId: els.prefixId.value.trim(),
+          codigo: els.prefixCode.value.trim(),
+          descripcion: els.prefixDescription.value.trim()
+        }, 'Guardando prefijo...');
+        els.prefixForm.reset();
+        await refreshAdminData();
+      } catch (error) {
+        Modal.alert('No fue posible guardar el prefijo', escapeHtml(normalizeError(error)));
+      }
+    }
+
+    function syncSelectedTemplate() {
+      const templates = (state.boot.catalogs || {}).templates || [];
+      const template = templates.find(function(item) {
+        return item.templateKey === els.templateSelect.value;
+      });
+      state.selectedTemplateKey = els.templateSelect.value;
+      els.templateHtml.value = template && template.htmlContent ? template.htmlContent : '';
+    }
+
+    async function handleTemplateSave(event) {
+      event.preventDefault();
+      try {
+        await runServer('apiSaveTemplate', {
+          templateKey: els.templateSelect.value,
+          templateName: els.templateSelect.options[els.templateSelect.selectedIndex].textContent,
+          variant: els.templateSelect.value.indexOf('MULTI') !== -1 ? 'MULTI' : 'SINGLE',
+          htmlContent: els.templateHtml.value
+        }, 'Guardando plantilla...');
+        await refreshAdminData();
+      } catch (error) {
+        Modal.alert('No fue posible guardar la plantilla', escapeHtml(normalizeError(error)));
+      }
+    }
+
+    function renderAuditTable(rows) {
+      if (!els.auditTableBody) {
+        return;
+      }
+      els.auditTableBody.innerHTML = rows.length ? rows.map(function(row) {
+        return '<tr><td>' + escapeHtml(row.timestamp) + '</td><td>' + escapeHtml(row.entityType) + '</td><td>' + escapeHtml(row.entityId) + '</td><td>' + escapeHtml(row.action) + '</td><td>' + escapeHtml(row.actorName || row.actorEmail) + '</td><td>' + escapeHtml(row.summary || '') + '</td></tr>';
+      }).join('') : '<tr><td colspan="6" class="empty-state">Sin eventos de auditoría.</td></tr>';
+    }
+
+    async function refreshAudit() {
+      try {
+        const rows = await runServer('apiGetAuditEntries', {
+          search: els.auditSearch.value.trim(),
+          limit: 150
+        }, 'Consultando auditoría...');
+        state.boot.audit = rows;
+        renderAuditTable(rows);
+      } catch (error) {
+        Modal.alert('No fue posible consultar auditoría', escapeHtml(normalizeError(error)));
+      }
+    }
+
+    async function refreshAdminData() {
+      const adminData = await runServer('apiGetAdminBootstrap', undefined, 'Actualizando datos administrativos...');
+      state.boot.users = adminData.users || [];
+      state.boot.catalogs = adminData.catalogs || state.boot.catalogs;
+      state.boot.audit = adminData.audit || state.boot.audit;
+      populateCatalogSelectors();
+      renderUsersTable();
+      renderCatalogLists();
+      renderAuditTable(state.boot.audit || []);
+    }
+
+    async function refreshBootstrapData() {
+      const data = await runServer('apiBootstrap', undefined, 'Actualizando información...');
+      state.boot = data;
+      hydrateIdentity();
+      applyRoleVisibility();
+      populateCatalogSelectors();
+      renderDashboard();
+      renderArchiveTable(state.boot.documents || []);
+      renderUsersTable();
+      renderCatalogLists();
+      renderAuditTable(state.boot.audit || []);
+    }
+
+    function renderLineItems(lines) {
+      const prefixOptions = els.lineItemsBody.dataset.prefixOptions || '';
+      const agreementOptions = els.lineItemsBody.dataset.agreementOptions || '';
+      const maxLines = Number((state.boot.config || {}).maxCeafPerDocument || 3);
+      els.addLineButton.disabled = lines.length >= maxLines;
+      els.lineItemsBody.innerHTML = lines.map(function(line, index) {
+        return '<article class="line-card" data-line-card data-line-index="' + index + '">' +
+          '<div class="line-card-header">' +
+            '<div class="line-card-title">' +
+              '<span class="line-chip">Linea ' + (index + 1) + '</span>' +
+              '<p>CEAF, convenio, centro y certificacion.</p>' +
+            '</div>' +
+            '<button class="icon-button" data-line-action="remove" type="button" aria-label="Eliminar linea"><span class="material-symbols-outlined">delete</span></button>' +
+          '</div>' +
+          '<div class="line-card-grid">' +
+            '<label class="field"><span>CEAF</span><input data-field="ceaf" inputmode="numeric" autocomplete="off" maxlength="3" pattern="\\d{3}" title="Debe contener exactamente 3 dígitos" value="' + escapeHtml(line.ceaf || '') + '" placeholder="123"></label>' +
+            '<label class="field"><span>Convenio</span><select data-field="tipoConvenio"><option value="">Seleccione</option>' + agreementOptions.replace(/value="([^\"]+)"/g, function(match, value) {
+              return 'value="' + value + '"' + (value === line.tipoConvenio ? ' selected' : '');
+            }) + '</select></label>' +
+            '<label class="field"><span>Centro</span><input data-field="centro" value="' + escapeHtml(line.centro || '') + '" placeholder="Centro"></label>' +
+            '<label class="field"><span>Prefijo</span><select data-field="certPrefix">' + prefixOptions.replace(/value="([^\"]+)"/g, function(match, value) {
+              return 'value="' + value + '"' + (value === line.certPrefix ? ' selected' : '');
+            }) + '</select></label>' +
+            '<label class="field"><span>Numeracion</span><input data-field="numeracion" inputmode="numeric" autocomplete="off" maxlength="7" pattern="\\d{7}" title="Debe contener exactamente 7 dígitos" value="' + escapeHtml(line.numeracion || '') + '" placeholder="1234567"></label>' +
+            '<label class="field"><span>Fecha de certificacion</span><input data-field="fechaCertificacion" type="date" min="' + getMinAllowedDate() + '" max="' + getTodayDate() + '" value="' + escapeHtml(line.fechaCertificacion || '') + '"></label>' +
+          '</div>' +
+        '</article>';
+      }).join('');
+    }
+
+    function handleLineTableClick(event) {
+      const button = event.target.closest('[data-line-action="remove"]');
+      if (!button) {
+        return;
+      }
+      const current = collectDocumentForm();
+      if (current.lines.length === 1) {
+        Modal.alert('Limite minimo', 'El documento debe mantener al menos una linea CEAF.');
+        return;
+      }
+      const row = button.closest('[data-line-card]');
+      const index = Number(row.dataset.lineIndex);
+      current.lines.splice(index, 1);
+      renderLineItems(current.lines);
+    }
+
+    function collectDocumentForm() {
+      const lines = Array.from(els.lineItemsBody.querySelectorAll('[data-line-card]')).map(function(row) {
+        return {
+          ceaf: row.querySelector('[data-field="ceaf"]').value.trim(),
+          tipoConvenio: row.querySelector('[data-field="tipoConvenio"]').value.trim(),
+          centro: row.querySelector('[data-field="centro"]').value.trim(),
+          certPrefix: row.querySelector('[data-field="certPrefix"]').value.trim(),
+          numeracion: row.querySelector('[data-field="numeracion"]').value.trim(),
+          fechaCertificacion: row.querySelector('[data-field="fechaCertificacion"]').value
+        };
+      });
+
+      return {
+        documentId: els.documentId.value.trim(),
+        regionalAbreviatura: els.regionalSelect.value.trim(),
+        notes: els.documentNotes.value.trim(),
+        lines: lines
+      };
+    }
+
+    async function handleSaveDocument(event) {
+      event.preventDefault();
+      try {
+        const payload = collectDocumentForm();
+        validateClientDocument(payload);
+        const result = expectObjectResponse(await runServer('apiSaveDocument', payload, 'Guardando oficio...'), 'guardar el documento', 'document');
+        const cachedDetail = getCachedDocumentDetail(result.document.documentId);
+        state.currentDocument = result.document;
+        state.currentDetail = {
+          document: result.document,
+          lines: Array.isArray(payload.lines) ? payload.lines.slice() : [],
+          previewHtml: result.previewHtml || '',
+          auditEntries: cachedDetail && Array.isArray(cachedDetail.auditEntries) ? cachedDetail.auditEntries : []
+        };
+        cacheDocumentDetail(state.currentDetail);
+        els.documentId.value = result.document.documentId;
+        els.generatorTitle.textContent = 'Editando ' + result.document.documentId;
+        renderPreview(result.previewHtml, result.document);
+        try {
+          await refreshBootstrapData();
+        } catch (refreshError) {
+        }
+        Modal.alert('Documento guardado', escapeHtml(result.message || 'Documento guardado correctamente.'));
+      } catch (error) {
+        Modal.alert('No fue posible guardar', escapeHtml(normalizeError(error)));
+      }
+    }
+
+    function renderArchiveTable(documents) {
+      const rows = Array.isArray(documents) ? documents : [];
+      els.archiveTableBody.innerHTML = rows.length ? rows.map(function(document) {
+        const statusClass = document.status === 'ACTIVO' ? 'badge badge-active' : 'badge badge-archived';
+        return '<tr>' +
+          '<td><div class="table-meta"><strong>' + escapeHtml(document.documentId) + '</strong><span>' + escapeHtml((document.itemCount || 0) + ' lineas activas') + '</span></div></td>' +
+          '<td><span class="' + statusClass + '">' + escapeHtml(document.status) + '</span></td>' +
+          '<td>' + escapeHtml(document.regionalAbreviatura) + '</td>' +
+          '<td class="summary-cell">' + renderSummaryPills(document.ceafSummary, 'Sin CEAF') + '</td>' +
+          '<td class="summary-cell">' + renderSummaryPills(document.centroSummary, 'Sin centros') + '</td>' +
+          '<td class="summary-cell">' + renderSummaryPills(document.numeracionSummary, 'Sin numeraciones') + '</td>' +
+          '<td><div class="table-meta"><strong>' + escapeHtml(document.updatedAt || '') + '</strong><span>' + escapeHtml(document.ownerName || '') + '</span></div></td>' +
+          '<td class="archive-actions-cell"><div class="button-row compact archive-action-group">' +
+            '<button class="button button-secondary" data-archive-action="view" data-document-id="' + escapeHtml(document.documentId) + '" type="button">Ver</button>' +
+            '<button class="button button-secondary" data-archive-action="edit" data-document-id="' + escapeHtml(document.documentId) + '" type="button">Editar</button>' +
+            '<button class="button button-accent" data-archive-action="print" data-document-id="' + escapeHtml(document.documentId) + '" type="button">Imprimir</button>' +
+            '<button class="button button-secondary" data-archive-action="duplicate" data-document-id="' + escapeHtml(document.documentId) + '" type="button">Duplicar</button>' +
+            '<button class="button button-secondary" data-archive-action="archive" data-document-id="' + escapeHtml(document.documentId) + '" type="button">Anular</button>' +
+          '</div></td>' +
+        '</tr>';
+      }).join('') : '<tr><td colspan="8" class="empty-state">No se encontraron documentos con los filtros actuales.</td></tr>';
+    }
+
+    function refreshArchive() {
+      renderArchiveTable(getFilteredArchiveDocuments());
+    }
+
+    async function loadDocumentDetail(documentId) {
+      try {
+        const cached = getCachedDocumentDetail(documentId);
+        if (cached) {
+          state.currentDetail = cached;
+          state.currentDocument = cached.document;
+          renderDetail(cached);
+          switchView('detail');
+          return;
+        }
+        const detail = expectObjectResponse(await runServer('apiGetDocumentDetail', documentId, 'Cargando detalle del documento...'), 'abrir el documento', 'document');
+        state.currentDetail = detail;
+        state.currentDocument = detail.document;
+        cacheDocumentDetail(detail);
+        renderDetail(detail);
+        switchView('detail');
+      } catch (error) {
+        Modal.alert('No fue posible abrir el documento', escapeHtml(normalizeError(error)));
+      }
+    }
+
+    async function editDocument(documentId) {
+      try {
+        const cached = getCachedDocumentDetail(documentId);
+        if (cached) {
+          populateEditorFromDetail(cached);
+          return;
+        }
+        const detail = expectObjectResponse(await runServer('apiGetDocumentDetail', documentId, 'Cargando documento para edicion...'), 'cargar la edicion', 'document');
+        cacheDocumentDetail(detail);
+        populateEditorFromDetail(detail);
+      } catch (error) {
+        Modal.alert('No fue posible cargar la edicion', escapeHtml(normalizeError(error)));
+      }
+    }
+
+    async function duplicateDocument(documentId) {
+      try {
+        const duplicate = expectObjectResponse(await runServer('apiPrepareDuplicate', documentId, 'Preparando duplicado...'), 'duplicar el documento');
+        resetDocumentForm();
+        els.regionalSelect.value = duplicate.regionalAbreviatura || '';
+        els.documentNotes.value = duplicate.notes || '';
+        renderLineItems(Array.isArray(duplicate.lines) && duplicate.lines.length ? duplicate.lines : [createEmptyLine()]);
+        switchView('generator');
+      } catch (error) {
+        Modal.alert('No fue posible duplicar', escapeHtml(normalizeError(error)));
+      }
+    }
+
+    function renderUsersTable() {
+      if (!els.usersTableBody) {
+        return;
+      }
+      const rows = Array.isArray(state.boot.users) ? state.boot.users : [];
+      els.usersTableBody.innerHTML = rows.length ? rows.map(function(user) {
+        return '<tr>' +
+          '<td>' + escapeHtml(user.email) + '</td>' +
+          '<td>' + escapeHtml(user.displayName) + '</td>' +
+          '<td>' + escapeHtml(user.role) + '</td>' +
+          '<td>' + escapeHtml(user.status) + '</td>' +
+          '<td>' + escapeHtml(user.department || '') + '</td>' +
+          '<td><button class="button button-secondary" data-user-action="edit" data-user-email="' + escapeHtml(user.email) + '" type="button">Editar</button></td>' +
+        '</tr>';
+      }).join('') : '<tr><td colspan="6" class="empty-state">No hay usuarios cargados.</td></tr>';
+    }
+
+    function findUserByEmail(email) {
+      return (state.boot.users || []).find(function(user) {
+        return user.email === email;
+      }) || null;
+    }
+
+    function populateUserForm(user) {
+      if (!user || !els.userForm) {
+        return;
+      }
+      state.editingUserEmail = user.email;
+      els.userFormTitle.textContent = 'Editar usuario';
+      els.userEditingHint.hidden = false;
+      els.userEmail.readOnly = true;
+      els.userEmail.value = user.email || '';
+      els.userDisplayName.value = user.displayName || '';
+      els.userRoleInput.value = user.role || 'USER';
+      els.userStatus.value = user.status || 'ACTIVO';
+      els.userDepartment.value = user.department || '';
+      els.userNotes.value = user.notes || '';
+      if (els.mainContent) {
+        els.mainContent.scrollTop = 0;
+      }
+    }
+
+    function resetUserForm() {
+      if (!els.userForm) {
+        return;
+      }
+      state.editingUserEmail = '';
+      els.userForm.reset();
+      els.userFormTitle.textContent = 'Registrar o actualizar usuario';
+      els.userEditingHint.hidden = true;
+      els.userEmail.readOnly = false;
+      els.userRoleInput.value = 'USER';
+      els.userStatus.value = 'ACTIVO';
+    }
+
+    function handleUsersTableClick(event) {
+      const button = event.target.closest('[data-user-action="edit"]');
+      if (!button) {
+        return;
+      }
+      const user = findUserByEmail(button.dataset.userEmail);
+      if (!user) {
+        Modal.alert('Usuario no disponible', 'Recarga la informacion administrativa e intenta de nuevo.');
+        return;
+      }
+      populateUserForm(user);
+    }
+
+    async function handleUserSave(event) {
+      event.preventDefault();
+      try {
+        expectObjectResponse(await runServer('apiSaveUserAccess', {
+          email: els.userEmail.value.trim(),
+          displayName: els.userDisplayName.value.trim(),
+          role: els.userRoleInput.value,
+          status: els.userStatus.value,
+          department: els.userDepartment.value.trim(),
+          notes: els.userNotes.value.trim()
+        }, 'Guardando usuario...'), 'guardar el usuario');
+        resetUserForm();
+        await refreshAdminData();
+      } catch (error) {
+        Modal.alert('No fue posible guardar el usuario', escapeHtml(normalizeError(error)));
+      }
+    }
+
+    async function refreshAdminData() {
+      const adminData = expectObjectResponse(await runServer('apiGetAdminBootstrap', undefined, 'Actualizando datos administrativos...'), 'actualizar datos administrativos');
+      state.boot = ensureBootShape(state.boot);
+      state.boot.users = Array.isArray(adminData.users) ? adminData.users : [];
+      state.boot.catalogs = adminData.catalogs || state.boot.catalogs;
+      state.boot.audit = Array.isArray(adminData.audit) ? adminData.audit : state.boot.audit;
+      populateCatalogSelectors();
+      if (els.templateSelect && state.selectedTemplateKey) {
+        els.templateSelect.value = state.selectedTemplateKey;
+        syncSelectedTemplate();
+      }
+      renderUsersTable();
+      renderCatalogLists();
+      renderAuditTable(state.boot.audit || []);
+    }
+
+    async function refreshBootstrapData(options) {
+      const settings = options || {};
+      const run = settings.silent ? runServerSilently : runServer;
+
+      state.boot = ensureBootShape(state.boot);
+
+      const dashboard = expectObjectResponse(
+        await run('apiGetDashboardSummary', undefined, 'Actualizando informacion...'),
+        'actualizar el resumen operativo'
+      );
+      const documents = expectArrayResponse(
+        await run('apiListDocuments', {}, 'Actualizando historial...'),
+        'actualizar el historial'
+      );
+
+      state.boot.dashboard = dashboard;
+      state.boot.documents = documents;
+
+      if ((state.boot.currentUser || {}).role === 'ADMIN') {
+        const adminData = expectObjectResponse(
+          await run('apiGetAdminBootstrap', undefined, 'Actualizando datos administrativos...'),
+          'actualizar datos administrativos'
+        );
+        state.boot.users = Array.isArray(adminData.users) ? adminData.users : [];
+        state.boot.catalogs = adminData.catalogs || state.boot.catalogs;
+        state.boot.audit = Array.isArray(adminData.audit) ? adminData.audit : state.boot.audit;
+      }
+
+      hydrateIdentity();
+      applyRoleVisibility();
+      populateCatalogSelectors();
+      if (els.templateSelect && state.selectedTemplateKey) {
+        els.templateSelect.value = state.selectedTemplateKey;
+        syncSelectedTemplate();
+      }
+      renderDashboard();
+      refreshArchive();
+      renderUsersTable();
+      renderCatalogLists();
+      renderAuditTable(state.boot.audit || []);
+    }
+
+    function exportArchiveCsv() {
+      const rows = state.boot.documents || [];
+      if (!rows.length) {
+        Modal.alert('Nada que exportar', 'No hay documentos cargados para exportar.');
+        return;
+      }
+      const headers = ['documentId', 'status', 'regionalAbreviatura', 'regionalNombre', 'ceafSummary', 'centroSummary', 'numeracionSummary', 'updatedAt', 'ownerName'];
+      const csv = [headers.join(',')].concat(rows.map(function(row) {
+        return headers.map(function(header) {
+          return '"' + String(row[header] || '').replace(/"/g, '""') + '"';
+        }).join(',');
+      })).join('\n');
+
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'docgen-archive.csv';
+      link.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function escapeHtml(value) {
+      return String(value == null ? '' : value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function normalizeError(error) {
+      if (!error) {
+        return 'Ocurrió un error inesperado.';
+      }
+      if (typeof error === 'string') {
+        return error;
+      }
+      if (error.message) {
+        return error.message;
+      }
+      return JSON.stringify(error);
+    }
+
+    function callServer(functionName, payload, busyMessage, showBusy) {
+      if (showBusy) {
+        Busy.show(busyMessage);
+      }
+      return new Promise(function(resolve, reject) {
+        const runner = google.script.run
+          .withSuccessHandler(function(response) {
+            if (showBusy) {
+              Busy.hide();
+            }
+            resolve(response);
+          })
+          .withFailureHandler(function(error) {
+            if (showBusy) {
+              Busy.hide();
+            }
+            reject(error);
+          });
+
+        if (payload === undefined) {
+          runner[functionName]();
+        } else {
+          runner[functionName](payload);
+        }
+      });
+    }
+
+    function runServer(functionName, payload, busyMessage) {
+      return callServer(functionName, payload, busyMessage, true);
+    }
+
+    function runServerSilently(functionName, payload, busyMessage) {
+      return callServer(functionName, payload, busyMessage, false);
+    }
+  })();
+</script>

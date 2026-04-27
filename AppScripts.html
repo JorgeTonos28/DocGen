@@ -1050,12 +1050,16 @@
         size: A4 portrait;
       }
 
+      html {
+        background: #f2f5fa;
+      }
+
       * {
         box-sizing: border-box;
       }
 
       body {
-        margin: 50px;
+        margin: 24px;
         background: #f2f5fa;
         color: #000;
         font-family: INFOTEXT, Arial, sans-serif;
@@ -1116,8 +1120,11 @@
       }
 
       .document-shell {
+        position: relative;
         margin: 0 auto;
-        width: min(100%, 980px);
+        width: 190mm;
+        max-width: 100%;
+        min-height: 277mm;
         background: #fff;
         border: 1px solid #d7e0ec;
         box-shadow: 0 12px 28px rgba(20, 40, 80, 0.12);
@@ -1126,6 +1133,7 @@
 
       .preview-sheet {
         width: 100%;
+        min-height: 277mm;
       }
 
       .preview-sheet .content {
@@ -1138,12 +1146,13 @@
       }
 
       .fa-sketch-icon {
-        position: fixed;
-        bottom: 60px;
-        right: 10px;
-        font-size: 10px;
+        position: absolute;
+        right: 3.2mm;
+        bottom: 2.8mm;
+        font-size: 8px;
         color: #000;
-        z-index: 1000;
+        line-height: 1;
+        z-index: 2;
       }
 
       .empty-state {
@@ -1165,8 +1174,12 @@
       }
 
       @media print {
+        html {
+          background: #fff;
+        }
+
         body {
-          margin: 50px;
+          margin: 0;
           padding: 0;
           background: #fff;
           -webkit-print-color-adjust: exact;
@@ -1178,9 +1191,21 @@
         }
 
         .document-shell {
-          width: 100%;
+          width: 190mm;
+          max-width: none;
+          min-height: 277mm;
+          margin: 0 auto;
           border: 0;
           box-shadow: none;
+        }
+
+        .preview-sheet {
+          min-height: 277mm;
+        }
+
+        .fa-sketch-icon {
+          right: 2.6mm;
+          bottom: 2.2mm;
         }
       }
     </style>
@@ -1199,9 +1224,8 @@
 
     <div class="document-shell">
       ${previewHtml}
+      <i class="fa-brands fa-sketch fa-sketch-icon"></i>
     </div>
-
-    <i class="fa-brands fa-sketch fa-sketch-icon"></i>
 
     <script>
       (function() {

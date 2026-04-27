@@ -1,7 +1,7 @@
 function renderDocumentHtml_(payload, actor, regionalOverride) {
   const regional = regionalOverride || getRegionalByAbbreviation_(payload.regionalAbreviatura);
   const templateKey = payload.lines.length > 1 ? TEMPLATE_KEYS.OFICIO_MULTI : TEMPLATE_KEYS.OFICIO_SINGLE;
-  let html = getTemplateHtml_(templateKey);
+  let html = stripCreatorNameLine_(getTemplateHtml_(templateKey));
   const currentYear = toNumber_(payload.documentYear, new Date().getFullYear());
 
   const replacements = {
@@ -11,7 +11,7 @@ function renderDocumentHtml_(payload, actor, regionalOverride) {
     '**CARGO**': escapeHtml_((regional.sexo === 'Hombre' ? 'Director Regional ' : 'Directora Regional ') + extractRegionalCargoSuffix_(regional.cargo || regional.regional)),
     '**ANO_OFICIO**': String(currentYear),
     '**INICIALES_USUARIO**': escapeHtml_(actor.initials || buildUserInitials_(actor.displayName)),
-    '**NOMBRE_USUARIO_CREADOR**': escapeHtml_(actor.displayName || '')
+    '**NOMBRE_USUARIO_CREADOR**': ''
   };
 
   Object.keys(replacements).forEach(function(token) {
@@ -36,6 +36,13 @@ function renderDocumentHtml_(payload, actor, regionalOverride) {
   }
 
   return html;
+}
+
+function stripCreatorNameLine_(html) {
+  return String(html || '').replace(
+    /<p[^>]*>\s*(?:<span[^>]*>\s*)?\*\*NOMBRE_USUARIO_CREADOR\*\*(?:\s*<\/span>)?\s*<\/p>/gi,
+    ''
+  );
 }
 
 function extractRegionalCargoSuffix_(value) {

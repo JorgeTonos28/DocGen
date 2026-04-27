@@ -327,7 +327,7 @@ function isOfficialOficioTemplate_(html) {
   return normalized.indexOf('**DIRIGIDO**') !== -1 &&
     normalized.indexOf('margin-left:144pt') !== -1 &&
     normalized.indexOf('width:440.85pt') !== -1 &&
-    normalized.indexOf('**NOMBRE_USUARIO_CREADOR**') !== -1;
+    normalized.indexOf('**INICIALES_USUARIO**') !== -1;
 }
 
 function normalizeRole_(value) {

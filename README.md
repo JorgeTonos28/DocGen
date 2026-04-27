@@ -19,7 +19,7 @@ El proyecto ya incluye:
 - header superior simplificado solo con avatar abreviado y footer del sidebar reducido a la version;
 - scroll dedicado para auditoria del documento y auditoria global cuando la lista crece;
 - scrollbars estilizados segun la linea grafica institucional;
-- modo imprimible alineado a la estructura visual del Legacy, con icono inferior derecho, nombre del creador y contenido oficial;
+- modo imprimible alineado a la estructura visual del Legacy, con icono inferior derecho, identificador corto del creador y geometria estable para A4;
 - fallback automatico a las plantillas bundladas cuando la hoja `Plantillas` contiene una version vieja o incompatible del oficio oficial;
 - acceso por cuenta activa del dominio + hoja `Usuarios`;
 - logo y firma desde Drive mediante `data URL`;

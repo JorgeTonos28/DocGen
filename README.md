@@ -69,10 +69,11 @@ Doc_Gen/
 
 ## Manifest y servicios
 
-`appsscript.json` ya declara el servicio avanzado de Drive:
+`appsscript.json` ya declara el servicio avanzado de Drive, los scopes requeridos y la configuracion de web app:
 
 ```json
 {
+  "timeZone": "America/Santo_Domingo",
   "dependencies": {
     "enabledAdvancedServices": [
       {
@@ -81,6 +82,17 @@ Doc_Gen/
         "version": "v3"
       }
     ]
+  },
+  "exceptionLogging": "STACKDRIVER",
+  "runtimeVersion": "V8",
+  "oauthScopes": [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive",
+    "https://www.googleapis.com/auth/userinfo.email"
+  ],
+  "webapp": {
+    "executeAs": "USER_DEPLOYING",
+    "access": "DOMAIN"
   }
 }
 ```

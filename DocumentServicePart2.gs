@@ -108,11 +108,11 @@ function validateDocumentPayload_(payload, actor) {
   });
 
   const normalizedLines = lines.map(function(line, index) {
-    const ceaf = normalizeString_(line.ceaf);
+    const ceaf = normalizeCeafCode_(line.ceaf);
     const tipoConvenio = normalizeString_(line.tipoConvenio);
     const centro = normalizeString_(line.centro);
     const certPrefix = normalizeUpper_(line.certPrefix);
-    const numeracion = normalizeString_(line.numeracion);
+    const numeracion = normalizeCertNumber_(line.numeracion);
     const fechaCertificacion = toIsoDateString_(line.fechaCertificacion);
 
     if (!/^\d{3}$/.test(ceaf)) {
@@ -182,7 +182,7 @@ function validateCertificationDate_(isoDate, lookbackDays) {
 }
 
 function assertNumerationUniqueness_(numeraciones, currentDocumentId, actor) {
-  const currentNumbers = numeraciones.map(normalizeString_);
+  const currentNumbers = numeraciones.map(normalizeCertNumber_);
   const activeDocuments = getSheetRecords_(SHEETS.DOCUMENTS).filter(function(document) {
     if (normalizeUpper_(document.status) !== DOCUMENT_STATUS.ACTIVE) {
       return false;
@@ -196,7 +196,7 @@ function assertNumerationUniqueness_(numeraciones, currentDocumentId, actor) {
   const activeDocumentMap = getRecordMapByField_(activeDocuments, 'document_id');
   const conflictingLine = getSheetRecords_(SHEETS.DOCUMENT_LINES).find(function(line) {
     return normalizeBoolean_(line.is_current || 'false') &&
-      currentNumbers.indexOf(normalizeString_(line.numeracion)) !== -1 &&
+      currentNumbers.indexOf(normalizeCertNumber_(line.numeracion)) !== -1 &&
       Object.prototype.hasOwnProperty.call(activeDocumentMap, normalizeString_(line.document_id));
   });
 
@@ -302,10 +302,10 @@ function mapDocumentRecordToClient_(record) {
     regionalNombre: record.regional_nombre,
     status: normalizeUpper_(record.status || DOCUMENT_STATUS.ACTIVE),
     itemCount: toNumber_(record.item_count, 0),
-    ceafSummary: normalizeString_(record.ceaf_summary),
+    ceafSummary: normalizeCeafSummary_(record.ceaf_summary),
     convenioSummary: normalizeString_(record.convenio_summary),
     centroSummary: normalizeString_(record.centro_summary),
-    numeracionSummary: normalizeString_(record.numeracion_summary),
+    numeracionSummary: normalizeCertSummary_(record.numeracion_summary),
     notes: normalizeString_(record.notes),
     createdAt: toClientDateTime_(record.created_at),
     createdByEmail: record.created_by_email,

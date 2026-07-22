@@ -23,6 +23,7 @@ El proyecto ya incluye:
 - fallback automatico a las plantillas bundladas cuando la hoja `Plantillas` contiene una version vieja o incompatible del oficio oficial;
 - acceso por cuenta activa del dominio + hoja `Usuarios`;
 - logo y firma desde Drive mediante `data URL`;
+- preservacion de ceros a la izquierda en CEAF y numeracion, tanto al leer desde Sheets como al guardar nuevas lineas;
 - validacion de formulario alineada al MVP: CEAF de 3 digitos, numeracion de 7 digitos, ventana de fecha controlada y unicidad de numeracion activa con mensaje del usuario dueño cuando aplica;
 - seed base heredado del sistema Legacy para regionales, convenios, prefijos y usuarios.
 
@@ -68,10 +69,11 @@ Doc_Gen/
 
 ## Manifest y servicios
 
-`appsscript.json` ya declara el servicio avanzado de Drive:
+`appsscript.json` ya declara el servicio avanzado de Drive, los scopes requeridos y la configuracion de web app:
 
 ```json
 {
+  "timeZone": "America/Santo_Domingo",
   "dependencies": {
     "enabledAdvancedServices": [
       {
@@ -80,6 +82,17 @@ Doc_Gen/
         "version": "v3"
       }
     ]
+  },
+  "exceptionLogging": "STACKDRIVER",
+  "runtimeVersion": "V8",
+  "oauthScopes": [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive",
+    "https://www.googleapis.com/auth/userinfo.email"
+  ],
+  "webapp": {
+    "executeAs": "USER_DEPLOYING",
+    "access": "DOMAIN"
   }
 }
 ```
@@ -202,6 +215,7 @@ Los nombres base se tomaron del MVP Legacy y de la data entregada para la migrac
 - cada oficio admite de 1 a 3 lineas CEAF;
 - `ceaf` debe tener exactamente 3 digitos;
 - `numeracion` debe tener exactamente 7 digitos;
+- `ceaf`, `numeracion`, `ceaf_summary` y `numeracion_summary` se tratan como texto para preservar ceros a la izquierda;
 - las numeraciones deben ser unicas entre documentos activos;
 - la fecha de certificacion no puede estar en el futuro ni fuera de la ventana permitida;
 - el documento se anula logicamente, no se borra fisicamente;

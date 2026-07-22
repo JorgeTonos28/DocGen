@@ -55,6 +55,37 @@ function normalizeString_(value) {
   return String(value == null ? '' : value).trim();
 }
 
+function normalizeDigitString_(value, length) {
+  const digits = normalizeString_(value).replace(/\D/g, '');
+  if (!digits) {
+    return '';
+  }
+  if (digits.length > length) {
+    return digits;
+  }
+  return digits.padStart(length, '0');
+}
+
+function normalizeCeafCode_(value) {
+  return normalizeDigitString_(value, 3);
+}
+
+function normalizeCertNumber_(value) {
+  return normalizeDigitString_(value, 7);
+}
+
+function normalizeCeafSummary_(value) {
+  return normalizeString_(value).replace(/([A-Z]+-)(\d{1,3})(-\d{4})/g, function(match, prefix, number, suffix) {
+    return prefix + normalizeCeafCode_(number) + suffix;
+  });
+}
+
+function normalizeCertSummary_(value) {
+  return normalizeString_(value).replace(/([A-Z]+-)(\d{1,7})(-\d{4})/g, function(match, prefix, number, suffix) {
+    return prefix + normalizeCertNumber_(number) + suffix;
+  });
+}
+
 function normalizeUpper_(value) {
   return normalizeString_(value).toUpperCase();
 }

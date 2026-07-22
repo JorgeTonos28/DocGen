@@ -10,6 +10,11 @@ function getDataSpreadsheet_() {
   throw new Error('No se encontro una hoja de calculo vinculada. Configure DOCGEN_SPREADSHEET_ID en Script Properties o vincule el proyecto a una spreadsheet.');
 }
 
+const TEXT_FORMAT_COLUMNS = Object.freeze({
+  Documentos: ['ceaf_summary', 'numeracion_summary'],
+  DocumentoLineas: ['ceaf', 'cert_prefix', 'numeracion']
+});
+
 function getSheetByNameOrThrow_(sheetName) {
   const headers = SHEET_HEADERS[sheetName];
   if (headers && headers.length) {
@@ -49,6 +54,9 @@ function ensureSheetStructure_(sheetName, headers) {
     if (sheet.getFrozenRows() !== 1) {
       sheet.setFrozenRows(1);
     }
+    if (lastRow >= 2) {
+      applyTextColumnFormats_(sheetName, sheet, headers, 2, lastRow - 1);
+    }
     return sheet;
   }
 
@@ -63,6 +71,7 @@ function ensureSheetStructure_(sheetName, headers) {
   sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
   if (rows.length) {
     ensureSheetSize_(sheet, headers.length, rows.length + 1);
+    applyTextColumnFormats_(sheetName, sheet, headers, 2, rows.length);
     sheet.getRange(2, 1, rows.length, headers.length).setValues(rows);
   }
   sheet.setFrozenRows(1);
@@ -110,6 +119,7 @@ function appendSheetRecords_(sheetName, records) {
   });
   const startRow = sheet.getLastRow() + 1;
   ensureSheetSize_(sheet, headers.length, startRow + rows.length - 1);
+  applyTextColumnFormats_(sheetName, sheet, headers, startRow, rows.length);
   sheet.getRange(startRow, 1, rows.length, headers.length).setValues(rows);
 }
 
@@ -127,6 +137,7 @@ function updateSheetRecords_(sheetName, records) {
       return record[header] != null ? record[header] : '';
     });
     ensureSheetSize_(sheet, headers.length, record.__rowNum);
+    applyTextColumnFormats_(sheetName, sheet, headers, record.__rowNum, 1);
     sheet.getRange(record.__rowNum, 1, 1, headers.length).setValues([row]);
   });
 }
@@ -155,6 +166,20 @@ function ensureSheetSize_(sheet, minColumns, minRows) {
   if (sheet.getMaxRows() < requiredRows) {
     sheet.insertRowsAfter(sheet.getMaxRows(), requiredRows - sheet.getMaxRows());
   }
+}
+
+function applyTextColumnFormats_(sheetName, sheet, headers, startRow, rowCount) {
+  const fields = TEXT_FORMAT_COLUMNS[sheetName] || [];
+  if (!fields.length || rowCount <= 0) {
+    return;
+  }
+
+  fields.forEach(function(field) {
+    const columnIndex = headers.indexOf(field) + 1;
+    if (columnIndex > 0) {
+      sheet.getRange(startRow, columnIndex, rowCount, 1).setNumberFormat('@');
+    }
+  });
 }
 
 function readRawSheetRecords_(sheet, lastRow, lastColumn, existingHeaders) {

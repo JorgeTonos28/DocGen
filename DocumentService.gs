@@ -106,16 +106,16 @@ function getDocumentDetail_(documentId, user) {
     documentYear: toNumber_(header.document_year, new Date().getFullYear()),
     regionalAbreviatura: header.regional_abreviatura,
     lines: lines.map(function(line) {
-      return {
-        lineId: line.line_id,
-        sortOrder: toNumber_(line.sort_order, 1),
-        ceaf: normalizeString_(line.ceaf),
-        tipoConvenio: normalizeString_(line.tipo_convenio),
-        centro: normalizeString_(line.centro),
-        certPrefix: normalizeString_(line.cert_prefix),
-        numeracion: normalizeString_(line.numeracion),
-        fechaCertificacion: toIsoDateString_(line.fecha_certificacion)
-      };
+        return {
+          lineId: line.line_id,
+          sortOrder: toNumber_(line.sort_order, 1),
+          ceaf: normalizeCeafCode_(line.ceaf),
+          tipoConvenio: normalizeString_(line.tipo_convenio),
+          centro: normalizeString_(line.centro),
+          certPrefix: normalizeString_(line.cert_prefix),
+          numeracion: normalizeCertNumber_(line.numeracion),
+          fechaCertificacion: toIsoDateString_(line.fecha_certificacion)
+        };
     }),
     notes: header.notes || ''
   }, actor, regional);
@@ -143,11 +143,11 @@ function getDocumentDetail_(documentId, user) {
       return {
         lineId: line.line_id,
         sortOrder: toNumber_(line.sort_order, 1),
-        ceaf: normalizeString_(line.ceaf),
+        ceaf: normalizeCeafCode_(line.ceaf),
         tipoConvenio: normalizeString_(line.tipo_convenio),
         centro: normalizeString_(line.centro),
         certPrefix: normalizeString_(line.cert_prefix),
-        numeracion: normalizeString_(line.numeracion),
+        numeracion: normalizeCertNumber_(line.numeracion),
         fechaCertificacion: toIsoDateString_(line.fecha_certificacion)
       };
     }),

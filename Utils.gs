@@ -14,6 +14,20 @@ function toIsoDateString_(value) {
   if (!value) {
     return '';
   }
+  if (typeof value === 'string') {
+    const normalized = normalizeString_(value);
+    const isoMatch = normalized.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (isoMatch) {
+      return isValidLocalDateParts_(isoMatch[1], isoMatch[2], isoMatch[3]) ? normalized : '';
+    }
+    const displayMatch = normalized.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (displayMatch) {
+      if (!isValidLocalDateParts_(displayMatch[3], displayMatch[2], displayMatch[1])) {
+        return '';
+      }
+      return displayMatch[3] + '-' + displayMatch[2].padStart(2, '0') + '-' + displayMatch[1].padStart(2, '0');
+    }
+  }
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) {
     return '';
@@ -39,11 +53,51 @@ function parseDateValue_(value) {
   if (value instanceof Date) {
     return value;
   }
+  if (typeof value === 'string') {
+    const normalized = normalizeString_(value);
+    const isoMatch = normalized.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (isoMatch) {
+      return parseLocalDateParts_(isoMatch[1], isoMatch[2], isoMatch[3]);
+    }
+    const displayMatch = normalized.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (displayMatch) {
+      return parseLocalDateParts_(displayMatch[3], displayMatch[2], displayMatch[1]);
+    }
+  }
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+function parseLocalDateParts_(year, month, day) {
+  if (!isValidLocalDateParts_(year, month, day)) {
+    return null;
+  }
+  return new Date(Number(year), Number(month) - 1, Number(day));
+}
+
+function isValidLocalDateParts_(year, month, day) {
+  const y = Number(year);
+  const m = Number(month);
+  const d = Number(day);
+  if (!Number.isInteger(y) || !Number.isInteger(m) || !Number.isInteger(d)) {
+    return false;
+  }
+  const date = new Date(y, m - 1, d);
+  return date.getFullYear() === y && date.getMonth() === m - 1 && date.getDate() === d;
+}
+
 function formatDateDisplayEs_(value) {
+  if (typeof value === 'string') {
+    const normalized = normalizeString_(value);
+    const isoMatch = normalized.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (isoMatch && isValidLocalDateParts_(isoMatch[1], isoMatch[2], isoMatch[3])) {
+      return isoMatch[3] + '/' + isoMatch[2] + '/' + isoMatch[1];
+    }
+    const displayMatch = normalized.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (displayMatch && isValidLocalDateParts_(displayMatch[3], displayMatch[2], displayMatch[1])) {
+      return displayMatch[1].padStart(2, '0') + '/' + displayMatch[2].padStart(2, '0') + '/' + displayMatch[3];
+    }
+  }
   const date = parseDateValue_(value);
   if (!date) {
     return '';

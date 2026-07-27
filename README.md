@@ -24,6 +24,7 @@ El proyecto ya incluye:
 - acceso por cuenta activa del dominio + hoja `Usuarios`;
 - logo y firma desde Drive mediante `data URL`;
 - preservacion de ceros a la izquierda en CEAF y numeracion, tanto al leer desde Sheets como al guardar nuevas lineas;
+- preservacion exacta de la fecha de certificacion seleccionada, sin corrimientos por zona horaria en preview o impresion;
 - validacion de formulario alineada al MVP: CEAF de 3 digitos, numeracion de 7 digitos, ventana de fecha controlada y unicidad de numeracion activa con mensaje del usuario dueño cuando aplica;
 - seed base heredado del sistema Legacy para regionales, convenios, prefijos y usuarios.
 
@@ -218,6 +219,7 @@ Los nombres base se tomaron del MVP Legacy y de la data entregada para la migrac
 - `ceaf`, `numeracion`, `ceaf_summary` y `numeracion_summary` se tratan como texto para preservar ceros a la izquierda;
 - las numeraciones deben ser unicas entre documentos activos;
 - la fecha de certificacion no puede estar en el futuro ni fuera de la ventana permitida;
+- las fechas `yyyy-mm-dd` del formulario se interpretan como fechas locales, no como fechas UTC;
 - el documento se anula logicamente, no se borra fisicamente;
 - toda accion relevante se registra en `Auditoria`;
 - el render oficial usa la regional, sexo, director y plantilla correcta single/multi;

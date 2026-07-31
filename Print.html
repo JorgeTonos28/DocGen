@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <base target="_top">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta http-equiv="Cache-Control" content="no-store, max-age=0, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title><?= documentTitle ?> | Vista imprimible</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <style>
+      @page {
+        margin: 1cm;
+        size: A4 portrait;
+      }
+
+      html {
+        background: #f2f5fa;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 24px;
+        background: #f2f5fa;
+        color: #000;
+        font-family: INFOTEXT, Arial, sans-serif;
+      }
+
+      .toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 14px 18px;
+        border: 1px solid #d7e0ec;
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.96);
+        position: sticky;
+        top: 16px;
+        z-index: 10;
+        margin: 0 auto 18px;
+        max-width: 980px;
+      }
+
+      .toolbar h1,
+      .toolbar p {
+        margin: 0;
+      }
+
+      .toolbar p {
+        color: #5e6a7d;
+        line-height: 1.45;
+      }
+
+      .toolbar-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      .button {
+        min-height: 42px;
+        padding: 0 16px;
+        border-radius: 10px;
+        border: 0;
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      .button-primary {
+        background: #f37021;
+        color: #fff;
+      }
+
+      .button-secondary {
+        background: #fff;
+        color: #0b1c30;
+        border: 1px solid #d7e0ec;
+      }
+
+      .document-shell {
+        position: relative;
+        margin: 0 auto;
+        width: 190mm;
+        max-width: 100%;
+        min-height: 277mm;
+        background: #fff;
+        border: 1px solid #d7e0ec;
+        box-shadow: 0 12px 28px rgba(20, 40, 80, 0.12);
+        padding: 0;
+      }
+
+      .preview-sheet {
+        width: 100%;
+        min-height: 277mm;
+      }
+
+      .preview-sheet .content {
+        margin: 0 auto;
+        width: 88%;
+      }
+
+      .preview-sheet table,
+      table {
+        margin: 0 auto;
+      }
+
+      .fa-sketch-icon {
+        position: absolute;
+        right: 3.2mm;
+        bottom: 2.8mm;
+        font-size: 8px;
+        color: #000;
+        line-height: 1;
+        z-index: 2;
+      }
+
+      @media (max-width: 900px) {
+        body {
+          margin: 18px;
+        }
+
+        .toolbar {
+          position: static;
+          flex-direction: column;
+          align-items: stretch;
+        }
+      }
+
+      @media print {
+        html {
+          background: #fff;
+        }
+
+        body {
+          margin: 0;
+          padding: 0;
+          background: #fff;
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }
+
+        .toolbar {
+          display: none !important;
+        }
+
+        .document-shell {
+          width: 190mm;
+          max-width: none;
+          min-height: 277mm;
+          margin: 0 auto;
+          border: 0;
+          box-shadow: none;
+        }
+
+        .preview-sheet {
+          min-height: 277mm;
+        }
+
+        .fa-sketch-icon {
+          right: 2.6mm;
+          bottom: 2.2mm;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <script>
+      window.__PRINT_DOCUMENT__ = <?!= documentDetailJson ?>;
+      window.__PRINT_AUTO_OPEN__ = <?!= printAutoOpen ?>;
+    </script>
+
+    <div class="toolbar">
+      <div>
+        <h1><?= documentTitle ?></h1>
+        <p>Documento institucional listo para impresión o exportación PDF.</p>
+      </div>
+      <div class="toolbar-actions">
+        <button id="printNowButton" class="button button-primary" type="button">Imprimir ahora</button>
+        <button id="closePrintButton" class="button button-secondary" type="button">Volver</button>
+      </div>
+    </div>
+
+    <div class="document-shell">
+      <div class="preview-sheet">
+        <?!= previewHtml ?>
+      </div>
+      <i class="fa-brands fa-sketch fa-sketch-icon"></i>
+    </div>
+
+    <script>
+      (function() {
+        function markPrintedAndOpen() {
+          if (window.google && google.script && google.script.run) {
+            google.script.run.withFailureHandler(function() {}).apiMarkPrinted(window.__PRINT_DOCUMENT__.documentId);
+          }
+          window.print();
+        }
+
+        document.getElementById('printNowButton').addEventListener('click', markPrintedAndOpen);
+        document.getElementById('closePrintButton').addEventListener('click', function() {
+          if (window.history.length > 1) {
+            window.history.back();
+            return;
+          }
+          window.close();
+        });
+
+        if (window.__PRINT_AUTO_OPEN__) {
+          window.addEventListener('load', function() {
+            setTimeout(markPrintedAndOpen, 500);
+          });
+        }
+      })();
+    </script>
+  </body>
+</html>

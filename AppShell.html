@@ -1,0 +1,516 @@
+<div id="busyOverlay" class="busy-overlay" hidden>
+  <div class="busy-card">
+    <div class="spinner"></div>
+    <div>
+      <strong>Procesando...</strong>
+      <p id="busyText">Espera mientras completamos la operación.</p>
+    </div>
+  </div>
+</div>
+
+<div id="appModal" class="modal-backdrop" hidden>
+  <div class="modal-card">
+    <div class="modal-header">
+      <h3 id="modalTitle">Mensaje</h3>
+      <button id="modalCloseButton" class="icon-button" type="button" aria-label="Cerrar">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-actions">
+      <button id="modalCancelButton" class="button button-secondary" type="button" hidden>Cancelar</button>
+      <button id="modalConfirmButton" class="button button-primary" type="button">Aceptar</button>
+    </div>
+  </div>
+</div>
+
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-lockup">
+        <img id="appLogo" class="brand-logo" alt="Logo institucional" hidden>
+        <div class="brand-mark" id="brandFallback">I</div>
+        <div>
+          <h1>DocGen</h1>
+        </div>
+      </div>
+      <button id="newDocumentShortcut" class="button button-accent" type="button">
+        <span class="material-symbols-outlined">add</span>
+        Nuevo oficio
+      </button>
+    </div>
+
+    <nav class="sidebar-nav" id="navMenu">
+      <button class="nav-link is-active" data-view="dashboard" type="button">
+        <span class="material-symbols-outlined">dashboard</span>
+        Panel
+      </button>
+      <button class="nav-link" data-view="generator" type="button">
+        <span class="material-symbols-outlined">description</span>
+        Generador
+      </button>
+      <button class="nav-link" data-view="archive" type="button">
+        <span class="material-symbols-outlined">inventory_2</span>
+        Historial
+      </button>
+      <button class="nav-link is-admin-only" data-view="users" type="button">
+        <span class="material-symbols-outlined">group</span>
+        Usuarios
+      </button>
+      <button class="nav-link is-admin-only" data-view="catalogs" type="button">
+        <span class="material-symbols-outlined">database</span>
+        Catálogos
+      </button>
+      <button class="nav-link is-admin-only" data-view="audit" type="button">
+        <span class="material-symbols-outlined">history</span>
+        Auditoría
+      </button>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="version-pill" id="sidebarVersion">v1.3.0</div>
+    </div>
+  </aside>
+
+  <div class="sidebar-backdrop" id="sidebarBackdrop" hidden></div>
+
+  <div class="main-frame">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button id="sidebarToggle" class="icon-button mobile-only" type="button" aria-label="Abrir menú">
+          <span class="material-symbols-outlined">menu</span>
+        </button>
+        <div>
+          <p class="eyebrow">DocGen INFOTEP</p>
+          <h2 id="viewTitle">Panel</h2>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <div class="topbar-user">
+          <div class="user-chip">
+            <div class="avatar" id="userAvatar">U</div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main id="mainContent" class="main-content">
+      <section class="view is-active" data-view-panel="dashboard">
+        <div class="view-header">
+          <div>
+            <h3>Resumen operativo</h3>
+            <p>Métricas rápidas, actividad reciente y distribución de documentos por regional.</p>
+          </div>
+        </div>
+        <div id="dashboardMetrics" class="metric-grid"></div>
+        <div class="two-column">
+          <div class="panel">
+            <div class="panel-header">
+              <h4>Documentos recientes</h4>
+            </div>
+            <div id="dashboardRecent" class="list-stack panel-body"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-header">
+              <h4>Activos por regional</h4>
+            </div>
+            <div id="dashboardRegional" class="list-stack panel-body"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="view generator-view" data-view-panel="generator">
+        <div class="view-header">
+          <div>
+            <h3 id="generatorTitle">Generador de oficios</h3>
+            <p>Completa la regional y las líneas CEAF. Cada proceso valida numeración, fechas y consistencia antes de guardar.</p>
+          </div>
+        </div>
+
+        <div class="generator-layout">
+          <div class="panel">
+            <div class="panel-header">
+              <h4>Datos del oficio</h4>
+            </div>
+            <form id="documentForm" class="form-stack panel-body">
+              <input id="documentId" name="documentId" type="hidden">
+              <div class="form-grid">
+                <div class="field">
+                  <label for="documentType">Tipo de documento</label>
+                  <input id="documentType" type="text" value="Oficio de remisión CEAF" readonly>
+                </div>
+                <div class="field">
+                  <label for="regionalSelect">Regional</label>
+                  <select id="regionalSelect" name="regional" required></select>
+                </div>
+              </div>
+
+              <div class="table-toolbar">
+                <div>
+                  <h5>Líneas CEAF</h5>
+                  <p>Hasta 3 líneas por oficio. La numeración de certificación debe ser única y las fechas deben caer dentro de la ventana permitida.</p>
+                </div>
+                <button id="addLineButton" class="button button-secondary" type="button">
+                  <span class="material-symbols-outlined">add</span>
+                  Agregar línea
+                </button>
+              </div>
+
+              <div id="lineItemsBody" class="line-items-grid"></div>
+
+              <div class="field">
+                <label for="documentNotes">Notas internas</label>
+                <textarea id="documentNotes" rows="3" placeholder="Comentarios u observaciones internas del oficio"></textarea>
+              </div>
+
+              <div class="button-row">
+                <button id="resetFormButton" class="button button-secondary" type="button">Nuevo documento</button>
+                <button id="saveDocumentButton" class="button button-primary" type="submit">
+                  <span class="material-symbols-outlined">save</span>
+                  Guardar y generar vista previa
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <aside class="panel preview-panel">
+            <div class="panel-header">
+              <h4>Vista previa</h4>
+              <div class="button-row compact">
+                <button id="editFromPreviewButton" class="button button-secondary" type="button" disabled>Seguir editando</button>
+                <button id="printDocumentButton" class="button button-accent" type="button" disabled>
+                  <span class="material-symbols-outlined">print</span>
+                  Imprimir
+                </button>
+              </div>
+            </div>
+            <div id="previewMeta" class="preview-meta empty-state">
+              Guarda el oficio para ver aquí la plantilla oficial renderizada.
+            </div>
+            <div id="previewContainer" class="preview-container"></div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="view archive-view" data-view-panel="archive">
+        <div class="view-header">
+          <div>
+            <h3>Historial documental</h3>
+            <p>Consulta, filtra, duplica, imprime y anula documentos registrados.</p>
+          </div>
+          <button id="exportArchiveButton" class="button button-secondary" type="button">
+            <span class="material-symbols-outlined">download</span>
+            Exportar CSV
+          </button>
+        </div>
+
+        <div class="panel">
+          <div class="filter-grid panel-body">
+            <label class="field">
+              <span>Búsqueda</span>
+              <input id="archiveSearch" type="search" placeholder="Documento, regional, centro o numeración">
+            </label>
+            <label class="field">
+              <span>Estado</span>
+              <select id="archiveStatus">
+                <option value="">Todos</option>
+                <option value="ACTIVO">Activos</option>
+                <option value="ANULADO">Anulados</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Regional</span>
+              <select id="archiveRegional">
+                <option value="">Todas</option>
+              </select>
+            </label>
+            <div class="button-row compact filter-actions">
+              <button id="archiveFilterButton" class="button button-primary" type="button">Aplicar</button>
+              <button id="archiveClearButton" class="button button-secondary" type="button">Limpiar</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="table-wrap panel-body panel-body-table">
+            <table class="data-table dense-table archive-table">
+              <thead>
+                <tr>
+                  <th>Documento</th>
+                  <th>Estado</th>
+                  <th>Regional</th>
+                  <th>CEAF</th>
+                  <th>Centro</th>
+                  <th>Numeración</th>
+                  <th>Actualizado</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="archiveTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section class="view" data-view-panel="detail">
+        <div class="view-header">
+          <div>
+            <h3>Detalle de documento</h3>
+            <p id="detailSubtitle">Selecciona un documento desde el historial para inspeccionarlo.</p>
+          </div>
+          <div class="button-row compact">
+            <button id="detailBackButton" class="button button-secondary" type="button">Volver al historial</button>
+            <button id="detailEditButton" class="button button-primary" type="button" disabled>Editar</button>
+            <button id="detailPrintButton" class="button button-accent" type="button" disabled>Imprimir</button>
+          </div>
+        </div>
+
+        <div class="two-column detail-layout">
+          <div class="stack-column">
+            <div class="panel">
+              <div class="panel-header">
+                <h4>Resumen</h4>
+              </div>
+              <div id="detailSummary" class="detail-grid empty-state panel-body">Sin documento cargado.</div>
+            </div>
+            <div class="panel">
+              <div class="panel-header">
+                <h4>Líneas activas</h4>
+              </div>
+              <div id="detailLinesList" class="list-stack detail-lines-stack panel-body">Sin líneas activas.</div>
+            </div>
+            <div class="panel">
+              <div class="panel-header">
+                <h4>Auditoría del documento</h4>
+              </div>
+              <div id="detailAudit" class="list-stack detail-audit-log empty-state panel-body">Aún no hay eventos para mostrar.</div>
+            </div>
+          </div>
+          <div class="panel preview-panel">
+            <div class="panel-header">
+              <h4>Documento renderizado</h4>
+            </div>
+            <div id="detailPreview" class="preview-container"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="view users-view is-admin-only" data-view-panel="users">
+        <div class="view-header">
+          <div>
+            <h3>Usuarios y permisos</h3>
+            <p>Controla acceso, rol y estado de cuentas del dominio institucional.</p>
+          </div>
+        </div>
+        <div class="two-column users-layout">
+          <div class="panel">
+            <div class="panel-header">
+              <h4 id="userFormTitle">Registrar o actualizar usuario</h4>
+            </div>
+            <form id="userForm" class="form-stack panel-body">
+              <div id="userEditingHint" class="inline-notice" hidden>
+                Estás editando una cuenta existente. Usa "Nuevo usuario" para limpiar el formulario.
+              </div>
+              <div class="field">
+                <label for="userEmail">Correo</label>
+                <input id="userEmail" type="email" placeholder="usuario@infotep.gob.do" required>
+              </div>
+              <div class="field">
+                <label for="userDisplayName">Nombre visible</label>
+                <input id="userDisplayName" type="text" placeholder="Nombre Apellido">
+              </div>
+              <div class="form-grid">
+                <div class="field">
+                  <label for="userRoleField">Rol</label>
+                  <select id="userRoleField">
+                    <option value="USER">USER</option>
+                    <option value="ADMIN">ADMIN</option>
+                    <option value="AUDITOR">AUDITOR</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="userStatus">Estado</label>
+                  <select id="userStatus">
+                    <option value="ACTIVO">ACTIVO</option>
+                    <option value="PENDIENTE">PENDIENTE</option>
+                    <option value="INACTIVO">INACTIVO</option>
+                  </select>
+                </div>
+              </div>
+              <div class="field">
+                <label for="userDepartment">Departamento</label>
+                <input id="userDepartment" type="text" placeholder="Jurídica, Rectoría, etc.">
+              </div>
+              <div class="field">
+                <label for="userNotes">Notas</label>
+                <textarea id="userNotes" rows="3"></textarea>
+              </div>
+              <div class="button-row">
+                <button class="button button-primary" type="submit">Guardar usuario</button>
+                <button id="userResetButton" class="button button-secondary" type="button">Nuevo usuario</button>
+              </div>
+            </form>
+          </div>
+          <div class="panel">
+            <div class="panel-header">
+              <h4>Cuentas registradas</h4>
+            </div>
+            <div class="table-wrap panel-body panel-body-table">
+              <table class="data-table dense-table">
+                <thead>
+                  <tr>
+                    <th>Correo</th>
+                    <th>Nombre</th>
+                    <th>Rol</th>
+                    <th>Estado</th>
+                    <th>Departamento</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="usersTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="view catalogs-view is-admin-only" data-view-panel="catalogs">
+        <div class="view-header">
+          <div>
+            <h3>Catálogos y plantillas</h3>
+            <p>Gestiona regionales, tipos de convenio, prefijos y contenido HTML de plantillas.</p>
+          </div>
+        </div>
+        <div class="three-column catalog-layout">
+          <div class="panel">
+            <div class="panel-header">
+              <h4>Regionales</h4>
+            </div>
+            <form id="regionalForm" class="form-stack panel-body">
+              <input id="regionalId" type="hidden">
+              <div class="form-grid">
+                <label class="field">
+                  <span>Abreviatura</span>
+                  <input id="regionalAbbr" type="text" maxlength="12" required>
+                </label>
+                <label class="field">
+                  <span>Sexo</span>
+                  <select id="regionalSexo">
+                    <option value="Hombre">Hombre</option>
+                    <option value="Mujer">Mujer</option>
+                  </select>
+                </label>
+              </div>
+              <label class="field">
+                <span>Nombre regional</span>
+                <input id="regionalName" type="text" required>
+              </label>
+              <label class="field">
+                <span>Director(a)</span>
+                <input id="regionalDirector" type="text" required>
+              </label>
+              <label class="field">
+                <span>Cargo</span>
+                <input id="regionalCargo" type="text">
+              </label>
+              <button class="button button-primary" type="submit">Guardar regional</button>
+            </form>
+            <div id="regionalList" class="list-stack compact panel-body panel-body-list"></div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-header">
+              <h4>Convenios y prefijos</h4>
+            </div>
+            <form id="agreementForm" class="form-stack compact panel-body">
+              <input id="agreementId" type="hidden">
+              <label class="field">
+                <span>Tipo de convenio</span>
+                <input id="agreementName" type="text" required>
+              </label>
+              <button class="button button-secondary" type="submit">Guardar convenio</button>
+            </form>
+            <div id="agreementList" class="list-stack compact panel-body panel-body-list"></div>
+            <hr class="separator">
+            <form id="prefixForm" class="form-stack compact panel-body">
+              <input id="prefixId" type="hidden">
+              <div class="form-grid">
+                <label class="field">
+                  <span>Prefijo</span>
+                  <input id="prefixCode" type="text" maxlength="5" required>
+                </label>
+                <label class="field">
+                  <span>Descripción</span>
+                  <input id="prefixDescription" type="text">
+                </label>
+              </div>
+              <button class="button button-secondary" type="submit">Guardar prefijo</button>
+            </form>
+            <div id="prefixList" class="list-stack compact panel-body panel-body-list"></div>
+          </div>
+
+          <div class="panel catalog-template-panel">
+            <div class="panel-header">
+              <h4>Plantillas HTML</h4>
+            </div>
+            <form id="templateForm" class="form-stack panel-body">
+              <label class="field">
+                <span>Plantilla</span>
+                <select id="templateSelect"></select>
+              </label>
+              <label class="field">
+                <span>Contenido HTML</span>
+                <textarea id="templateHtml" rows="16"></textarea>
+              </label>
+              <button class="button button-primary" type="submit">Guardar plantilla</button>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      <section class="view is-admin-only" data-view-panel="audit">
+        <div class="view-header">
+          <div>
+            <h3>Auditoría global</h3>
+            <p>Trazabilidad de acciones sobre documentos, usuarios, catálogos y plantillas.</p>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="filter-grid panel-body">
+            <label class="field">
+              <span>Búsqueda</span>
+              <input id="auditSearch" type="search" placeholder="Entidad, acción, actor o resumen">
+            </label>
+            <div class="button-row compact filter-actions">
+              <button id="auditFilterButton" class="button button-primary" type="button">Filtrar</button>
+            </div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="table-wrap audit-log-wrap panel-body panel-body-table">
+            <table class="data-table dense-table audit-log-table">
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Entidad</th>
+                  <th>ID</th>
+                  <th>Acción</th>
+                  <th>Actor</th>
+                  <th>Resumen</th>
+                </tr>
+              </thead>
+              <tbody id="auditTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="app-footer">
+      <div class="app-footer-spacer"></div>
+      <div class="app-footer-signature" id="appFooterSignatureWrap" hidden>
+        <img id="appFooterSignature" class="app-footer-signature-image" alt="Firma de la aplicacion" hidden>
+      </div>
+    </footer>
+  </div>
+</div>

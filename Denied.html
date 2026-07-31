@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <base target="_top">
+    <meta charset="utf-8">
+    <title><?= appName ?> | Acceso denegado</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f8fc;
+        --surface: #ffffff;
+        --text: #0f223d;
+        --muted: #5e6a7d;
+        --primary: #003366;
+        --accent: #f37021;
+        --border: #d4deec;
+        --danger-bg: #fff1ef;
+        --danger-text: #992111;
+      }
+
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        background:
+          radial-gradient(circle at top left, rgba(243,112,33,0.18), transparent 28%),
+          linear-gradient(180deg, #f9fbff 0%, var(--bg) 100%);
+        font-family: "Inter", sans-serif;
+        color: var(--text);
+      }
+      .card {
+        width: min(100%, 720px);
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        padding: 32px;
+        box-shadow: 0 24px 60px rgba(15,34,61,0.08);
+      }
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        border-radius: 999px;
+        background: rgba(0,51,102,0.08);
+        color: var(--primary);
+        font-weight: 700;
+        font-size: 12px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+      h1 {
+        margin: 18px 0 12px;
+        font-size: 30px;
+        line-height: 1.1;
+      }
+      p {
+        margin: 0 0 14px;
+        color: var(--muted);
+        line-height: 1.6;
+      }
+      .meta {
+        padding: 16px;
+        border-radius: 14px;
+        border: 1px solid var(--border);
+        background: #f9fbff;
+        margin-top: 16px;
+      }
+      .warning {
+        background: var(--danger-bg);
+        color: var(--danger-text);
+        border: 1px solid #ffc9c1;
+        border-radius: 14px;
+        padding: 16px;
+        margin-top: 20px;
+      }
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 24px;
+      }
+      .button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        min-height: 44px;
+        padding: 0 18px;
+        border-radius: 12px;
+        font-weight: 700;
+        text-decoration: none;
+        border: 1px solid transparent;
+      }
+      .button-primary {
+        background: var(--primary);
+        color: #fff;
+      }
+      .button-secondary {
+        background: #fff;
+        border-color: var(--border);
+        color: var(--text);
+      }
+    </style>
+  </head>
+  <body>
+    <script>
+      window.__DENIED__ = <?!= denied ?>;
+    </script>
+    <div class="card">
+      <span class="badge">Acceso restringido</span>
+      <h1>No tienes acceso a esta aplicación</h1>
+      <p id="deniedReason">Tu cuenta no cumple las condiciones de acceso definidas para esta web app.</p>
+      <div class="meta">
+        <p><strong>Correo detectado:</strong> <span id="deniedEmail">No disponible</span></p>
+        <p><strong>Estado:</strong> <span id="deniedStatus">No registrado</span></p>
+        <p><strong>Institución:</strong> <span id="deniedInstitution">INFOTEP</span></p>
+      </div>
+      <div class="warning" id="supportBox">
+        Si necesitas acceso, solicita habilitación al administrador responsable.
+      </div>
+      <div class="actions">
+        <a class="button button-primary" href="javascript:location.reload()">Reintentar</a>
+        <a class="button button-secondary" id="supportLink" href="#" hidden>Contactar soporte</a>
+      </div>
+    </div>
+    <script>
+      (function() {
+        const denied = window.__DENIED__ || {};
+        document.getElementById('deniedReason').textContent = denied.reason || 'Tu cuenta no está autorizada.';
+        document.getElementById('deniedEmail').textContent = denied.email || 'No disponible';
+        document.getElementById('deniedStatus').textContent = denied.status || 'No registrado';
+        document.getElementById('deniedInstitution').textContent = denied.institutionName || 'INFOTEP';
+
+        const supportBox = document.getElementById('supportBox');
+        const supportLink = document.getElementById('supportLink');
+        if (denied.supportEmail) {
+          supportBox.textContent = 'Solicita acceso escribiendo a ' + denied.supportEmail + '.';
+          supportLink.hidden = false;
+          supportLink.href = 'mailto:' + denied.supportEmail;
+          supportLink.textContent = 'Escribir a ' + denied.supportEmail;
+        }
+      })();
+    </script>
+  </body>
+</html>

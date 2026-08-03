@@ -1,9 +1,7 @@
-function getCatalogSnapshot_(user) {
+function getCatalogSnapshot_(user, options) {
   const actor = user || assertAuthorizedUser_();
-  const regionals = getSheetRecords_(SHEETS.REGIONALS)
-    .filter(function(row) {
-      return normalizeBoolean_(row.activo || 'true');
-    })
+  const includeInactive = Boolean(options && options.includeInactive && isAdminUser_(actor));
+  const allRegionals = getSheetRecords_(SHEETS.REGIONALS)
     .sort(function(a, b) {
       return normalizeString_(a.abreviatura).localeCompare(normalizeString_(b.abreviatura));
     })
@@ -19,10 +17,7 @@ function getCatalogSnapshot_(user) {
       };
     });
 
-  const agreementTypes = getSheetRecords_(SHEETS.AGREEMENT_TYPES)
-    .filter(function(row) {
-      return normalizeBoolean_(row.activo || 'true');
-    })
+  const allAgreementTypes = getSheetRecords_(SHEETS.AGREEMENT_TYPES)
     .sort(function(a, b) {
       return toNumber_(a.orden, 0) - toNumber_(b.orden, 0);
     })
@@ -34,10 +29,7 @@ function getCatalogSnapshot_(user) {
       };
     });
 
-  const prefixes = getSheetRecords_(SHEETS.CERT_PREFIXES)
-    .filter(function(row) {
-      return normalizeBoolean_(row.activo || 'true');
-    })
+  const allPrefixes = getSheetRecords_(SHEETS.CERT_PREFIXES)
     .sort(function(a, b) {
       return toNumber_(a.orden, 0) - toNumber_(b.orden, 0);
     })
@@ -62,10 +54,11 @@ function getCatalogSnapshot_(user) {
     };
   });
 
-  return {
-    regionals: regionals,
-    agreementTypes: agreementTypes,
-    prefixes: prefixes,
+  const snapshot = {
+    // The generator and its validation must only work with active catalog entries.
+    regionals: allRegionals.filter(function(item) { return item.activo; }),
+    agreementTypes: allAgreementTypes.filter(function(item) { return item.activo; }),
+    prefixes: allPrefixes.filter(function(item) { return item.activo; }),
     templates: isAdminUser_(actor) ? templates : templates.map(function(template) {
       return {
         templateKey: template.templateKey,
@@ -75,6 +68,16 @@ function getCatalogSnapshot_(user) {
       };
     })
   };
+
+  if (includeInactive) {
+    snapshot.management = {
+      regionals: allRegionals,
+      agreementTypes: allAgreementTypes,
+      prefixes: allPrefixes
+    };
+  }
+
+  return snapshot;
 }
 
 function listUsers_(user) {
@@ -183,7 +186,16 @@ function saveRegionalCatalogItem_(payload, actor) {
     throw new Error('El nombre del director o directora es obligatorio.');
   }
 
-  const existing = findRecordByField_(SHEETS.REGIONALS, 'abreviatura', abreviatura);
+  const existingById = payload.regionalId ? findRecordByField_(SHEETS.REGIONALS, 'regional_id', payload.regionalId) : null;
+  const existingByAbbreviation = findRecordByField_(SHEETS.REGIONALS, 'abreviatura', abreviatura);
+  if (
+    existingById &&
+    existingByAbbreviation &&
+    normalizeString_(existingById.regional_id) !== normalizeString_(existingByAbbreviation.regional_id)
+  ) {
+    throw new Error('La abreviatura indicada ya pertenece a otra regional.');
+  }
+  const existing = existingById || existingByAbbreviation;
   const record = existing || {
     regional_id: payload.regionalId || generateUuid_()
   };
@@ -193,7 +205,7 @@ function saveRegionalCatalogItem_(payload, actor) {
   record.director = director;
   record.sexo = normalizeRegionalSexo_(payload.sexo);
   record.cargo = normalizeString_(payload.cargo) || regional;
-  record.activo = String(payload.activo !== false);
+  record.activo = String(normalizeCatalogActive_(payload.activo));
   record.updated_at = nowIsoString_();
 
   if (existing) {
@@ -219,7 +231,7 @@ function saveAgreementTypeCatalogItem_(payload, actor) {
   if (!record.tipo_convenio) {
     throw new Error('El tipo de convenio es obligatorio.');
   }
-  record.activo = String(payload.activo !== false);
+  record.activo = String(normalizeCatalogActive_(payload.activo));
   record.orden = String(toNumber_(payload.orden, 10));
   record.updated_at = nowIsoString_();
 
@@ -247,7 +259,7 @@ function savePrefixCatalogItem_(payload, actor) {
     throw new Error('El codigo del prefijo es obligatorio.');
   }
   record.descripcion = normalizeString_(payload.descripcion);
-  record.activo = String(payload.activo !== false);
+  record.activo = String(normalizeCatalogActive_(payload.activo));
   record.orden = String(toNumber_(payload.orden, 10));
   record.updated_at = nowIsoString_();
 
@@ -275,14 +287,18 @@ function saveTemplate_(payload, user) {
   if (!templateKey || !htmlContent) {
     throw new Error('La clave y el contenido HTML de la plantilla son obligatorios.');
   }
+  const normalizedHtmlContent = normalizeOfficialTemplateHtml_(
+    htmlContent,
+    getBundledTemplateHtml_(templateKey)
+  );
 
   const existing = findRecordByField_(SHEETS.TEMPLATES, 'template_key', templateKey);
   const record = existing || {};
   record.template_key = templateKey;
   record.template_name = normalizeString_(payload.templateName || templateKey);
   record.variant = normalizeString_(payload.variant || 'OFICIO');
-  record.active = String(payload.active !== false);
-  record.html_content = htmlContent;
+  record.active = String(normalizeCatalogActive_(payload.active));
+  record.html_content = normalizedHtmlContent;
   record.updated_at = nowIsoString_();
   record.updated_by_email = actor.email;
 
@@ -305,13 +321,12 @@ function getTemplateHtml_(templateKey) {
   if (
     fromSheet &&
     normalizeBoolean_(fromSheet.active || 'true') &&
-    normalizeString_(fromSheet.html_content) &&
-    isOfficialOficioTemplate_(fromSheet.html_content)
+    normalizeString_(fromSheet.html_content)
   ) {
-    return fromSheet.html_content;
+    return normalizeOfficialTemplateHtml_(fromSheet.html_content, bundledTemplate);
   }
 
-  return bundledTemplate;
+  return normalizeOfficialTemplateHtml_(bundledTemplate, bundledTemplate);
 }
 
 function getBundledTemplateHtml_(templateKey) {
@@ -322,12 +337,156 @@ function getBundledTemplateHtml_(templateKey) {
   return HtmlService.createHtmlOutputFromFile('OficioTemplateSingle').getContent();
 }
 
-function isOfficialOficioTemplate_(html) {
-  const normalized = normalizeString_(html);
-  return normalized.indexOf('**DIRIGIDO**') !== -1 &&
-    normalized.indexOf('margin-left:144pt') !== -1 &&
-    normalized.indexOf('width:440.85pt') !== -1 &&
-    normalized.indexOf('**INICIALES_USUARIO**') !== -1;
+function normalizeOfficialTemplateHtml_(html, bundledTemplate) {
+  const restoredHtml = restoreOfficialHeadingBlock_(String(html || ''), String(bundledTemplate || ''));
+  const formatMarker = 'data-docgen-official-format';
+  if (restoredHtml.indexOf(formatMarker) !== -1) {
+    return restoredHtml;
+  }
+
+  const formattedHtml = restoredHtml.replace(
+    /class=(['"])([^'"]*\bcontent\b[^'"]*)\1/i,
+    function(match, quote, classNames) {
+      if (classNames.indexOf('docgen-official-template') !== -1) {
+        return match;
+      }
+      return 'class=' + quote + classNames + ' docgen-official-template' + quote;
+    }
+  );
+  const typography = '<style ' + formatMarker + '>' +
+    '.docgen-official-template,.docgen-official-template *{font-family:INFOTEXT,"Times New Roman",serif!important;}' +
+    '.docgen-official-template strong,.docgen-official-template strong *{font-family:INFOTEXT_B,INFOTEXT,"Times New Roman",serif!important;}' +
+    '</style>';
+  return typography + formattedHtml;
+}
+
+function restoreOfficialHeadingBlock_(html, bundledTemplate) {
+  const sourceRange = findOfficialHeadingRange_(html);
+  const bundledRange = findOfficialHeadingRange_(bundledTemplate);
+  if (!sourceRange || !bundledRange) {
+    return html;
+  }
+
+  const sourceValues = getOfficialHeadingValues_(html);
+  const bundledValues = getOfficialHeadingValues_(bundledTemplate);
+  let restoredBlock = bundledTemplate.slice(bundledRange.start, bundledRange.end);
+  ['subject', 'annex1', 'annex2'].forEach(function(field) {
+    const bundledValue = bundledValues[field];
+    const sourceValue = sourceValues[field];
+    if (bundledValue && sourceValue) {
+      restoredBlock = restoredBlock.split(bundledValue).join(sourceValue);
+    }
+  });
+
+  return html.slice(0, sourceRange.start) +
+    restoredBlock +
+    html.slice(sourceRange.end);
+}
+
+function getOfficialHeadingValues_(html) {
+  const paragraphs = getOfficialParagraphs_(html);
+  const subjectParagraph = paragraphs.find(function(paragraph) {
+    return paragraph.text.toLowerCase().indexOf('asunto') !== -1;
+  });
+  const annexIndex = paragraphs.findIndex(function(paragraph) {
+    return paragraph.text.toLowerCase().indexOf('anexos') !== -1;
+  });
+  let annex2 = '';
+  if (annexIndex !== -1) {
+    for (let index = annexIndex + 1; index < paragraphs.length; index += 1) {
+      if (paragraphs[index].text) {
+        annex2 = paragraphs[index].text;
+        break;
+      }
+    }
+  }
+
+  return {
+    subject: getOfficialValueAfterColon_(subjectParagraph && subjectParagraph.text),
+    annex1: getOfficialValueAfterColon_(annexIndex !== -1 && paragraphs[annexIndex].text),
+    annex2: annex2
+  };
+}
+
+function getOfficialValueAfterColon_(text) {
+  const normalized = String(text || '').trim();
+  const separatorIndex = normalized.indexOf(':');
+  return separatorIndex === -1 ? '' : normalized.slice(separatorIndex + 1).trim();
+}
+
+function findOfficialHeadingRange_(html) {
+  const paragraphs = getOfficialParagraphs_(html);
+  let startParagraph = -1;
+  let annexParagraph = -1;
+  paragraphs.some(function(paragraph, index) {
+    if (startParagraph === -1 && paragraph.text.indexOf('**DIRIGIDO**') !== -1) {
+      startParagraph = index;
+    }
+    if (startParagraph !== -1 && paragraph.text.toLowerCase().indexOf('anexos') !== -1) {
+      annexParagraph = index;
+      return true;
+    }
+    return false;
+  });
+
+  if (startParagraph === -1 || annexParagraph === -1) {
+    return null;
+  }
+
+  let nonEmptyParagraphs = 0;
+  for (let index = annexParagraph + 1; index < paragraphs.length; index += 1) {
+    if (!paragraphs[index].text) {
+      continue;
+    }
+    nonEmptyParagraphs += 1;
+    if (nonEmptyParagraphs === 2) {
+      return {
+        start: paragraphs[startParagraph].start,
+        end: paragraphs[index].start
+      };
+    }
+  }
+
+  return null;
+}
+
+function getOfficialParagraphs_(html) {
+  const paragraphs = [];
+  const paragraphPattern = /<p\b[^>]*>[\s\S]*?<\/p>/gi;
+  let match;
+  while ((match = paragraphPattern.exec(String(html || ''))) !== null) {
+    paragraphs.push({
+      start: match.index,
+      end: paragraphPattern.lastIndex,
+      text: getOfficialParagraphText_(match[0])
+    });
+  }
+  return paragraphs;
+}
+
+function getOfficialParagraphText_(paragraphHtml) {
+  return String(paragraphHtml || '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;|&#160;/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function getTemplateCacheVersion_(templateKey) {
+  const fromSheet = findRecordByField_(SHEETS.TEMPLATES, 'template_key', templateKey);
+  if (
+    fromSheet &&
+    normalizeBoolean_(fromSheet.active || 'true') &&
+    normalizeString_(fromSheet.html_content)
+  ) {
+    return normalizeString_(fromSheet.updated_at) || 'sheet-template';
+  }
+
+  return 'bundled-template';
+}
+
+function normalizeCatalogActive_(value) {
+  return value == null || value === '' ? true : normalizeBoolean_(value);
 }
 
 function normalizeRole_(value) {

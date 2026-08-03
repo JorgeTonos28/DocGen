@@ -238,9 +238,11 @@ function buildDocumentDetailCacheKey_(header, actor) {
   return [
     'docgen',
     'detail',
+    APP_VERSION,
     normalizeEmail_(actor && actor.email),
     normalizeString_(header && header.document_id),
-    normalizeString_(header && header.updated_at)
+    normalizeString_(header && header.updated_at),
+    getTemplateCacheVersion_(normalizeString_(header && header.template_variant))
   ].join(':');
 }
 
@@ -277,9 +279,10 @@ function getNextDocumentRevision_(documentId) {
   return revisions.length ? Math.max.apply(null, revisions) + 1 : 1;
 }
 
-function getRegionalByAbbreviation_(abreviatura) {
+function getRegionalByAbbreviation_(abreviatura, options) {
   const record = findRecordByField_(SHEETS.REGIONALS, 'abreviatura', normalizeUpper_(abreviatura));
-  if (!record || !normalizeBoolean_(record.activo || 'true')) {
+  const allowInactive = Boolean(options && options.allowInactive);
+  if (!record || (!allowInactive && !normalizeBoolean_(record.activo || 'true'))) {
     throw new Error('La regional seleccionada no existe o está inactiva.');
   }
   return {

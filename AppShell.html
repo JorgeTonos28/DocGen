@@ -68,7 +68,7 @@
     </nav>
 
     <div class="sidebar-footer">
-      <div class="version-pill" id="sidebarVersion">v1.3.0</div>
+      <div class="version-pill" id="sidebarVersion">v1.3.7</div>
     </div>
   </aside>
 
@@ -388,6 +388,10 @@
             </div>
             <form id="regionalForm" class="form-stack panel-body">
               <input id="regionalId" type="hidden">
+              <div class="catalog-form-heading">
+                <h5 id="regionalFormTitle">Nueva regional</h5>
+                <button id="regionalResetButton" class="button button-secondary catalog-reset" type="button" hidden>Cancelar</button>
+              </div>
               <div class="form-grid">
                 <label class="field">
                   <span>Abreviatura</span>
@@ -413,6 +417,13 @@
                 <span>Cargo</span>
                 <input id="regionalCargo" type="text">
               </label>
+              <label class="field">
+                <span>Estado</span>
+                <select id="regionalActive">
+                  <option value="true">Activa</option>
+                  <option value="false">Inactiva</option>
+                </select>
+              </label>
               <button class="button button-primary" type="submit">Guardar regional</button>
             </form>
             <div id="regionalList" class="list-stack compact panel-body panel-body-list"></div>
@@ -424,9 +435,20 @@
             </div>
             <form id="agreementForm" class="form-stack compact panel-body">
               <input id="agreementId" type="hidden">
+              <div class="catalog-form-heading">
+                <h5 id="agreementFormTitle">Nuevo convenio</h5>
+                <button id="agreementResetButton" class="button button-secondary catalog-reset" type="button" hidden>Cancelar</button>
+              </div>
               <label class="field">
                 <span>Tipo de convenio</span>
                 <input id="agreementName" type="text" required>
+              </label>
+              <label class="field">
+                <span>Estado</span>
+                <select id="agreementActive">
+                  <option value="true">Activo</option>
+                  <option value="false">Inactivo</option>
+                </select>
               </label>
               <button class="button button-secondary" type="submit">Guardar convenio</button>
             </form>
@@ -434,6 +456,10 @@
             <hr class="separator">
             <form id="prefixForm" class="form-stack compact panel-body">
               <input id="prefixId" type="hidden">
+              <div class="catalog-form-heading">
+                <h5 id="prefixFormTitle">Nuevo prefijo</h5>
+                <button id="prefixResetButton" class="button button-secondary catalog-reset" type="button" hidden>Cancelar</button>
+              </div>
               <div class="form-grid">
                 <label class="field">
                   <span>Prefijo</span>
@@ -444,6 +470,13 @@
                   <input id="prefixDescription" type="text">
                 </label>
               </div>
+              <label class="field">
+                <span>Estado</span>
+                <select id="prefixActive">
+                  <option value="true">Activo</option>
+                  <option value="false">Inactivo</option>
+                </select>
+              </label>
               <button class="button button-secondary" type="submit">Guardar prefijo</button>
             </form>
             <div id="prefixList" class="list-stack compact panel-body panel-body-list"></div>
@@ -462,6 +495,7 @@
                 <span>Contenido HTML</span>
                 <textarea id="templateHtml" rows="16"></textarea>
               </label>
+              <p class="template-source-note">La plantilla activa guardada aquí se usa en las vistas previas y la impresión de los oficios.</p>
               <button class="button button-primary" type="submit">Guardar plantilla</button>
             </form>
           </div>

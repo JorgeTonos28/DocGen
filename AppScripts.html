@@ -175,15 +175,24 @@
       els.regionalDirector = document.getElementById('regionalDirector');
       els.regionalSexo = document.getElementById('regionalSexo');
       els.regionalCargo = document.getElementById('regionalCargo');
+      els.regionalActive = document.getElementById('regionalActive');
+      els.regionalFormTitle = document.getElementById('regionalFormTitle');
+      els.regionalResetButton = document.getElementById('regionalResetButton');
       els.regionalList = document.getElementById('regionalList');
       els.agreementForm = document.getElementById('agreementForm');
       els.agreementId = document.getElementById('agreementId');
       els.agreementName = document.getElementById('agreementName');
+      els.agreementActive = document.getElementById('agreementActive');
+      els.agreementFormTitle = document.getElementById('agreementFormTitle');
+      els.agreementResetButton = document.getElementById('agreementResetButton');
       els.agreementList = document.getElementById('agreementList');
       els.prefixForm = document.getElementById('prefixForm');
       els.prefixId = document.getElementById('prefixId');
       els.prefixCode = document.getElementById('prefixCode');
       els.prefixDescription = document.getElementById('prefixDescription');
+      els.prefixActive = document.getElementById('prefixActive');
+      els.prefixFormTitle = document.getElementById('prefixFormTitle');
+      els.prefixResetButton = document.getElementById('prefixResetButton');
       els.prefixList = document.getElementById('prefixList');
       els.templateForm = document.getElementById('templateForm');
       els.templateSelect = document.getElementById('templateSelect');
@@ -326,11 +335,29 @@
       if (els.regionalForm) {
         els.regionalForm.addEventListener('submit', handleRegionalSave);
       }
+      if (els.regionalResetButton) {
+        els.regionalResetButton.addEventListener('click', resetRegionalForm);
+      }
+      if (els.regionalList) {
+        els.regionalList.addEventListener('click', handleCatalogListClick);
+      }
       if (els.agreementForm) {
         els.agreementForm.addEventListener('submit', handleAgreementSave);
       }
+      if (els.agreementResetButton) {
+        els.agreementResetButton.addEventListener('click', resetAgreementForm);
+      }
+      if (els.agreementList) {
+        els.agreementList.addEventListener('click', handleCatalogListClick);
+      }
       if (els.prefixForm) {
         els.prefixForm.addEventListener('submit', handlePrefixSave);
+      }
+      if (els.prefixResetButton) {
+        els.prefixResetButton.addEventListener('click', resetPrefixForm);
+      }
+      if (els.prefixList) {
+        els.prefixList.addEventListener('click', handleCatalogListClick);
       }
       if (els.templateForm) {
         els.templateForm.addEventListener('submit', handleTemplateSave);
@@ -400,6 +427,10 @@
       safeBoot.catalogs.prefixes = Array.isArray(safeBoot.catalogs.prefixes) ? safeBoot.catalogs.prefixes : [];
       safeBoot.catalogs.agreementTypes = Array.isArray(safeBoot.catalogs.agreementTypes) ? safeBoot.catalogs.agreementTypes : [];
       safeBoot.catalogs.templates = Array.isArray(safeBoot.catalogs.templates) ? safeBoot.catalogs.templates : [];
+      safeBoot.catalogs.management = safeBoot.catalogs.management || {};
+      safeBoot.catalogs.management.regionals = Array.isArray(safeBoot.catalogs.management.regionals) ? safeBoot.catalogs.management.regionals : safeBoot.catalogs.regionals;
+      safeBoot.catalogs.management.prefixes = Array.isArray(safeBoot.catalogs.management.prefixes) ? safeBoot.catalogs.management.prefixes : safeBoot.catalogs.prefixes;
+      safeBoot.catalogs.management.agreementTypes = Array.isArray(safeBoot.catalogs.management.agreementTypes) ? safeBoot.catalogs.management.agreementTypes : safeBoot.catalogs.agreementTypes;
       return safeBoot;
     }
 
@@ -495,6 +526,9 @@
       renderAuditTable(state.boot.audit || []);
       resetDocumentForm();
       resetUserForm();
+      resetRegionalForm();
+      resetAgreementForm();
+      resetPrefixForm();
     }
 
     function populateCatalogSelectors() {
@@ -1329,21 +1363,176 @@
         return;
       }
 
-      const regionals = ((state.boot.catalogs || {}).regionals || []);
-      const agreements = ((state.boot.catalogs || {}).agreementTypes || []);
-      const prefixes = ((state.boot.catalogs || {}).prefixes || []);
+      const regionals = getManagementCatalogItems('regionals');
+      const agreements = getManagementCatalogItems('agreementTypes');
+      const prefixes = getManagementCatalogItems('prefixes');
 
       els.regionalList.innerHTML = regionals.length ? regionals.map(function(item) {
-        return '<div class="list-item"><h5>' + escapeHtml(item.abreviatura + ' - ' + item.regional) + '</h5><p>' + escapeHtml(item.director || '') + '</p></div>';
+        return '<div class="list-item catalog-item">' +
+          '<div class="catalog-item-header"><h5>' + escapeHtml(item.abreviatura + ' - ' + item.regional) + '</h5>' + renderCatalogStatus(item.activo) + '</div>' +
+          '<p>' + escapeHtml(item.director || '') + '</p>' +
+          renderCatalogActions('regionales', item.regionalId, item.activo) +
+        '</div>';
       }).join('') : '<div class="empty-state">Sin regionales.</div>';
 
       els.agreementList.innerHTML = agreements.length ? agreements.map(function(item) {
-        return '<div class="list-item"><h5>' + escapeHtml(item.tipoConvenio) + '</h5></div>';
+        return '<div class="list-item catalog-item">' +
+          '<div class="catalog-item-header"><h5>' + escapeHtml(item.tipoConvenio) + '</h5>' + renderCatalogStatus(item.activo) + '</div>' +
+          renderCatalogActions('agreementTypes', item.convenioId, item.activo) +
+        '</div>';
       }).join('') : '<div class="empty-state">Sin convenios.</div>';
 
       els.prefixList.innerHTML = prefixes.length ? prefixes.map(function(item) {
-        return '<div class="list-item"><h5>' + escapeHtml(item.codigo) + '</h5><p>' + escapeHtml(item.descripcion || '') + '</p></div>';
+        return '<div class="list-item catalog-item">' +
+          '<div class="catalog-item-header"><h5>' + escapeHtml(item.codigo) + '</h5>' + renderCatalogStatus(item.activo) + '</div>' +
+          '<p>' + escapeHtml(item.descripcion || 'Sin descripción') + '</p>' +
+          renderCatalogActions('prefixes', item.prefixId, item.activo) +
+        '</div>';
       }).join('') : '<div class="empty-state">Sin prefijos.</div>';
+    }
+
+    function getManagementCatalogItems(collection) {
+      const catalogs = state.boot.catalogs || {};
+      const management = catalogs.management || {};
+      const managedItems = management[collection];
+      return Array.isArray(managedItems) ? managedItems : (catalogs[collection] || []);
+    }
+
+    function findManagementCatalogItem(collection, itemId) {
+      const idField = {
+        regionals: 'regionalId',
+        agreementTypes: 'convenioId',
+        prefixes: 'prefixId'
+      }[collection];
+      return getManagementCatalogItems(collection).find(function(item) {
+        return item && String(item[idField] || '') === String(itemId || '');
+      }) || null;
+    }
+
+    function renderCatalogStatus(active) {
+      const isActive = active !== false;
+      return '<span class="catalog-status' + (isActive ? '' : ' is-inactive') + '">' + (isActive ? 'Activo' : 'Inactivo') + '</span>';
+    }
+
+    function renderCatalogActions(collection, itemId, active) {
+      const isActive = active !== false;
+      const encodedId = escapeHtml(itemId || '');
+      return '<div class="catalog-item-actions">' +
+        '<button class="button button-secondary" data-catalog-action="edit" data-catalog-collection="' + collection + '" data-catalog-id="' + encodedId + '" type="button">Editar</button>' +
+        '<button class="button button-secondary" data-catalog-action="toggle" data-catalog-collection="' + collection + '" data-catalog-id="' + encodedId + '" type="button">' + (isActive ? 'Desactivar' : 'Activar') + '</button>' +
+      '</div>';
+    }
+
+    function handleCatalogListClick(event) {
+      const button = event.target.closest('[data-catalog-action]');
+      if (!button) {
+        return;
+      }
+      const collection = button.dataset.catalogCollection;
+      const item = findManagementCatalogItem(collection, button.dataset.catalogId);
+      if (!item) {
+        Modal.alert('Registro no disponible', 'Actualiza los catálogos e inténtalo de nuevo.');
+        return;
+      }
+      if (button.dataset.catalogAction === 'edit') {
+        populateCatalogForm(collection, item);
+        return;
+      }
+      toggleCatalogItem(collection, item);
+    }
+
+    async function toggleCatalogItem(collection, item) {
+      const nextActive = item.activo === false;
+      try {
+        await runServer('apiSaveCatalogItem', buildCatalogPayload(collection, item, nextActive), (nextActive ? 'Activando' : 'Desactivando') + ' registro...');
+        await refreshAdminData();
+      } catch (error) {
+        Modal.alert('No fue posible actualizar el estado', escapeHtml(normalizeError(error)));
+      }
+    }
+
+    function buildCatalogPayload(collection, item, active) {
+      if (collection === 'regionales') {
+        return {
+          collection: 'regionales',
+          regionalId: item.regionalId,
+          abreviatura: item.abreviatura,
+          regional: item.regional,
+          director: item.director,
+          sexo: item.sexo,
+          cargo: item.cargo,
+          activo: active
+        };
+      }
+      if (collection === 'agreementTypes') {
+        return {
+          collection: 'tiposConvenio',
+          convenioId: item.convenioId,
+          tipoConvenio: item.tipoConvenio,
+          activo: active
+        };
+      }
+      return {
+        collection: 'prefijos',
+        prefixId: item.prefixId,
+        codigo: item.codigo,
+        descripcion: item.descripcion,
+        activo: active
+      };
+    }
+
+    function populateCatalogForm(collection, item) {
+      if (collection === 'regionales') {
+        els.regionalId.value = item.regionalId || '';
+        els.regionalAbbr.value = item.abreviatura || '';
+        els.regionalName.value = item.regional || '';
+        els.regionalDirector.value = item.director || '';
+        els.regionalSexo.value = item.sexo || 'Hombre';
+        els.regionalCargo.value = item.cargo || '';
+        els.regionalActive.value = item.activo === false ? 'false' : 'true';
+        els.regionalFormTitle.textContent = 'Editar regional';
+        els.regionalResetButton.hidden = false;
+      } else if (collection === 'agreementTypes') {
+        els.agreementId.value = item.convenioId || '';
+        els.agreementName.value = item.tipoConvenio || '';
+        els.agreementActive.value = item.activo === false ? 'false' : 'true';
+        els.agreementFormTitle.textContent = 'Editar convenio';
+        els.agreementResetButton.hidden = false;
+      } else {
+        els.prefixId.value = item.prefixId || '';
+        els.prefixCode.value = item.codigo || '';
+        els.prefixDescription.value = item.descripcion || '';
+        els.prefixActive.value = item.activo === false ? 'false' : 'true';
+        els.prefixFormTitle.textContent = 'Editar prefijo';
+        els.prefixResetButton.hidden = false;
+      }
+      if (els.mainContent) {
+        els.mainContent.scrollTop = 0;
+      }
+    }
+
+    function resetRegionalForm() {
+      els.regionalForm.reset();
+      els.regionalId.value = '';
+      els.regionalActive.value = 'true';
+      els.regionalFormTitle.textContent = 'Nueva regional';
+      els.regionalResetButton.hidden = true;
+    }
+
+    function resetAgreementForm() {
+      els.agreementForm.reset();
+      els.agreementId.value = '';
+      els.agreementActive.value = 'true';
+      els.agreementFormTitle.textContent = 'Nuevo convenio';
+      els.agreementResetButton.hidden = true;
+    }
+
+    function resetPrefixForm() {
+      els.prefixForm.reset();
+      els.prefixId.value = '';
+      els.prefixActive.value = 'true';
+      els.prefixFormTitle.textContent = 'Nuevo prefijo';
+      els.prefixResetButton.hidden = true;
     }
 
     async function handleRegionalSave(event) {
@@ -1356,9 +1545,10 @@
           regional: els.regionalName.value.trim(),
           director: els.regionalDirector.value.trim(),
           sexo: els.regionalSexo.value,
-          cargo: els.regionalCargo.value.trim()
+          cargo: els.regionalCargo.value.trim(),
+          activo: els.regionalActive.value === 'true'
         }, 'Guardando regional...');
-        els.regionalForm.reset();
+        resetRegionalForm();
         await refreshAdminData();
       } catch (error) {
         Modal.alert('No fue posible guardar la regional', escapeHtml(normalizeError(error)));
@@ -1371,9 +1561,10 @@
         await runServer('apiSaveCatalogItem', {
           collection: 'tiposConvenio',
           convenioId: els.agreementId.value.trim(),
-          tipoConvenio: els.agreementName.value.trim()
+          tipoConvenio: els.agreementName.value.trim(),
+          activo: els.agreementActive.value === 'true'
         }, 'Guardando convenio...');
-        els.agreementForm.reset();
+        resetAgreementForm();
         await refreshAdminData();
       } catch (error) {
         Modal.alert('No fue posible guardar el convenio', escapeHtml(normalizeError(error)));
@@ -1387,9 +1578,10 @@
           collection: 'prefijos',
           prefixId: els.prefixId.value.trim(),
           codigo: els.prefixCode.value.trim(),
-          descripcion: els.prefixDescription.value.trim()
+          descripcion: els.prefixDescription.value.trim(),
+          activo: els.prefixActive.value === 'true'
         }, 'Guardando prefijo...');
-        els.prefixForm.reset();
+        resetPrefixForm();
         await refreshAdminData();
       } catch (error) {
         Modal.alert('No fue posible guardar el prefijo', escapeHtml(normalizeError(error)));
@@ -1414,6 +1606,12 @@
           variant: els.templateSelect.value.indexOf('MULTI') !== -1 ? 'MULTI' : 'SINGLE',
           htmlContent: els.templateHtml.value
         }, 'Guardando plantilla...');
+        // Force the next preview or print to request the newly saved template.
+        state.documentDetailCache = Object.create(null);
+        state.currentDetail = null;
+        if (els.previewContainer) {
+          els.previewContainer.innerHTML = '';
+        }
         await refreshAdminData();
       } catch (error) {
         Modal.alert('No fue posible guardar la plantilla', escapeHtml(normalizeError(error)));

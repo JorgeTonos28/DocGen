@@ -99,7 +99,8 @@ function getDocumentDetail_(documentId, user) {
   }
 
   const lines = getCurrentDocumentLines_(documentId);
-  const regional = getRegionalByAbbreviation_(header.regional_abreviatura);
+  // Historical documents remain printable even when their regional is later deactivated.
+  const regional = getRegionalByAbbreviation_(header.regional_abreviatura, { allowInactive: true });
   const previewHtml = renderDocumentHtml_({
     documentId: header.document_id,
     documentType: header.document_type,

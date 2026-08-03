@@ -78,7 +78,7 @@ function buildBootstrapPayload_(user) {
       initials: user.initials
     },
     config: getClientConfig_(),
-    catalogs: getCatalogSnapshot_(user),
+    catalogs: getCatalogSnapshot_(user, { includeInactive: isAdminUser_(user) }),
     dashboard: buildDashboardSummary_(user),
     documents: listDocuments_({}, user),
     audit: isAdminUser_(user) ? listAuditEntries_({ limit: 50 }, user) : [],
@@ -130,7 +130,7 @@ function apiGetAdminBootstrap() {
   const user = assertAdminUser_();
   return {
     users: listUsers_(user),
-    catalogs: getCatalogSnapshot_(user),
+    catalogs: getCatalogSnapshot_(user, { includeInactive: true }),
     audit: listAuditEntries_({ limit: 150 }, user)
   };
 }

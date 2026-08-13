@@ -40,7 +40,7 @@ function renderDocumentHtml_(payload, actor, regionalOverride) {
 
 function normalizeTipoConvenioAlignment_(html) {
   return String(html || '').replace(
-    /<p([^>]*)>(?=[\s\S]*?\*\*TC[1-3]\*\*)([\s\S]*?)<\/p>/gi,
+    /<p([^>]*)>((?:(?!<\/p>)[\s\S])*?\*\*TC[1-3]\*\*(?:(?!<\/p>)[\s\S])*?)<\/p>/gi,
     function(match, attributes, content) {
       let nextAttributes = attributes || '';
       const styleMatch = nextAttributes.match(/style=(['"])(.*?)\1/i);

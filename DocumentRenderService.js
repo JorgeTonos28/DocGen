@@ -1,7 +1,7 @@
 function renderDocumentHtml_(payload, actor, regionalOverride) {
   const regional = regionalOverride || getRegionalByAbbreviation_(payload.regionalAbreviatura);
   const templateKey = payload.lines.length > 1 ? TEMPLATE_KEYS.OFICIO_MULTI : TEMPLATE_KEYS.OFICIO_SINGLE;
-  let html = stripCreatorNameLine_(getTemplateHtml_(templateKey));
+  let html = normalizeTipoConvenioAlignment_(stripCreatorNameLine_(getTemplateHtml_(templateKey)));
   const currentYear = toNumber_(payload.documentYear, new Date().getFullYear());
 
   const replacements = {
@@ -36,6 +36,31 @@ function renderDocumentHtml_(payload, actor, regionalOverride) {
   }
 
   return html;
+}
+
+function normalizeTipoConvenioAlignment_(html) {
+  return String(html || '').replace(
+    /<p([^>]*)>((?:(?!<\/p>)[\s\S])*?\*\*TC[1-3]\*\*(?:(?!<\/p>)[\s\S])*?)<\/p>/gi,
+    function(match, attributes, content) {
+      let nextAttributes = attributes || '';
+      const styleMatch = nextAttributes.match(/style=(['"])(.*?)\1/i);
+
+      if (styleMatch) {
+        let styleValue = styleMatch[2]
+          .replace(/(?:^|;)\s*text-align\s*:\s*[^;]+;?/gi, '')
+          .trim();
+        if (styleValue && !/;\s*$/.test(styleValue)) {
+          styleValue += ';';
+        }
+        styleValue += ' text-align:center;';
+        nextAttributes = nextAttributes.replace(styleMatch[0], 'style=' + styleMatch[1] + styleValue + styleMatch[1]);
+      } else {
+        nextAttributes += ' style="text-align:center;"';
+      }
+
+      return '<p' + nextAttributes + '>' + content + '</p>';
+    }
+  );
 }
 
 function stripCreatorNameLine_(html) {

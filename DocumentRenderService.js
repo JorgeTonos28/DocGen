@@ -1,7 +1,7 @@
 function renderDocumentHtml_(payload, actor, regionalOverride) {
   const regional = regionalOverride || getRegionalByAbbreviation_(payload.regionalAbreviatura);
   const templateKey = payload.lines.length > 1 ? TEMPLATE_KEYS.OFICIO_MULTI : TEMPLATE_KEYS.OFICIO_SINGLE;
-  let html = stripCreatorNameLine_(getTemplateHtml_(templateKey));
+  let html = normalizeOficioTableLayout_(stripCreatorNameLine_(getTemplateHtml_(templateKey)));
   const currentYear = toNumber_(payload.documentYear, new Date().getFullYear());
 
   const replacements = {
@@ -36,6 +36,71 @@ function renderDocumentHtml_(payload, actor, regionalOverride) {
   }
 
   return html;
+}
+
+function normalizeOficioTableLayout_(html) {
+  const columnWidths = ['24.65pt', '73.5pt', '118.1pt', '79.5pt', '90.35pt'];
+
+  return String(html || '').replace(/<table\b[\s\S]*?<\/table>/gi, function(tableHtml) {
+    if (tableHtml.indexOf('**TC1**') === -1 || tableHtml.indexOf('**CEAF1**') === -1) {
+      return tableHtml;
+    }
+
+    let normalizedTable = tableHtml.replace(/^<table\b([^>]*)>/i, function(match, attributes) {
+      return '<table' + setHtmlInlineStyle_(attributes, 'table-layout', 'fixed') + '>';
+    });
+
+    normalizedTable = normalizedTable.replace(/<tr\b([^>]*)>([\s\S]*?)<\/tr>/gi, function(rowMatch, rowAttributes, rowHtml) {
+      let cellIndex = 0;
+      const normalizedRow = rowHtml.replace(/<td\b([^>]*)>([\s\S]*?)<\/td>/gi, function(cellMatch, cellAttributes, cellHtml) {
+        const width = columnWidths[cellIndex];
+        let normalizedCellHtml = cellHtml;
+
+        if (cellIndex === 2) {
+          normalizedCellHtml = normalizedCellHtml.replace(/<p\b([^>]*)>/gi, function(paragraphMatch, paragraphAttributes) {
+            return '<p' + setHtmlInlineStyle_(paragraphAttributes, 'text-align', 'center') + '>';
+          });
+        }
+
+        cellIndex += 1;
+        if (!width) {
+          return cellMatch;
+        }
+        return '<td' + setHtmlInlineStyle_(cellAttributes, 'width', width) + '>' + normalizedCellHtml + '</td>';
+      });
+
+      return '<tr' + rowAttributes + '>' + normalizedRow + '</tr>';
+    });
+
+    return normalizedTable;
+  });
+}
+
+function setHtmlInlineStyle_(attributes, property, value) {
+  const sourceAttributes = String(attributes || '');
+  const styleMatch = sourceAttributes.match(/\sstyle=(['"])(.*?)\1/i);
+  const declarations = styleMatch
+    ? styleMatch[2].split(';').map(function(declaration) { return declaration.trim(); }).filter(Boolean)
+    : [];
+  const propertyPattern = new RegExp('^' + property.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*:', 'i');
+  let propertyUpdated = false;
+
+  const nextDeclarations = declarations.map(function(declaration) {
+    if (!propertyPattern.test(declaration)) {
+      return declaration;
+    }
+    propertyUpdated = true;
+    return property + ':' + value;
+  });
+  if (!propertyUpdated) {
+    nextDeclarations.push(property + ':' + value);
+  }
+
+  const nextStyle = 'style="' + nextDeclarations.join('; ') + ';"';
+  if (styleMatch) {
+    return sourceAttributes.replace(styleMatch[0], ' ' + nextStyle);
+  }
+  return sourceAttributes + ' ' + nextStyle;
 }
 
 function stripCreatorNameLine_(html) {

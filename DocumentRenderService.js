@@ -35,14 +35,16 @@ function renderDocumentHtml_(payload, actor, regionalOverride) {
     html = html.replace(new RegExp('<tr id="ceaf' + i + '".*?<\\/tr>', 'gs'), '');
   }
 
-  return html;
+  return normalizeOficioTableLayout_(html);
 }
 
 function normalizeOficioTableLayout_(html) {
   const columnWidths = ['24.65pt', '73.5pt', '118.1pt', '79.5pt', '90.35pt'];
 
   return String(html || '').replace(/<table\b[\s\S]*?<\/table>/gi, function(tableHtml) {
-    if (tableHtml.indexOf('**TC1**') === -1 || tableHtml.indexOf('**CEAF1**') === -1) {
+    const hasAgreementColumn = /TIPO\s+DE\s+CONVENIO/i.test(tableHtml) || /\*\*TC[1-3]\*\*/i.test(tableHtml);
+    const hasCeafColumn = /\*\*CEAF[1-3]\*\*/i.test(tableHtml) || />\s*CEAF\s*</i.test(tableHtml);
+    if (!hasAgreementColumn || !hasCeafColumn) {
       return tableHtml;
     }
 

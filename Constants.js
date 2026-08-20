@@ -1,4 +1,4 @@
-const APP_VERSION = '1.3.7';
+const APP_VERSION = '1.3.11';
 const APP_NAME = 'DocGen INFOTEP';
 
 const SHEETS = Object.freeze({

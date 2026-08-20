@@ -1,7 +1,7 @@
 function renderDocumentHtml_(payload, actor, regionalOverride) {
   const regional = regionalOverride || getRegionalByAbbreviation_(payload.regionalAbreviatura);
   const templateKey = payload.lines.length > 1 ? TEMPLATE_KEYS.OFICIO_MULTI : TEMPLATE_KEYS.OFICIO_SINGLE;
-  let html = stripCreatorNameLine_(getTemplateHtml_(templateKey));
+  let html = normalizeOficioTableLayout_(stripCreatorNameLine_(getTemplateHtml_(templateKey)));
   const currentYear = toNumber_(payload.documentYear, new Date().getFullYear());
 
   const replacements = {
@@ -35,7 +35,99 @@ function renderDocumentHtml_(payload, actor, regionalOverride) {
     html = html.replace(new RegExp('<tr id="ceaf' + i + '".*?<\\/tr>', 'gs'), '');
   }
 
-  return html;
+  return injectOficioTableLayoutStyles_(normalizeOficioTableLayout_(html));
+}
+
+function injectOficioTableLayoutStyles_(html) {
+  const sourceHtml = String(html || '');
+  const styleMarker = 'data-docgen-oficio-table-layout';
+  if (sourceHtml.indexOf(styleMarker) !== -1) {
+    return sourceHtml;
+  }
+
+  const tableStyles = '<style ' + styleMarker + '>' +
+    '.docgen-official-template table,.content table{table-layout:fixed!important;width:100%!important;max-width:none!important;}' +
+    '.docgen-official-template table col:nth-child(1),.content table col:nth-child(1),' +
+    '.docgen-official-template table tr>td:nth-child(1),.content table tr>td:nth-child(1){width:7%!important;}' +
+    '.docgen-official-template table col:nth-child(2),.content table col:nth-child(2),' +
+    '.docgen-official-template table tr>td:nth-child(2),.content table tr>td:nth-child(2){width:17%!important;}' +
+    '.docgen-official-template table col:nth-child(3),.content table col:nth-child(3),' +
+    '.docgen-official-template table tr>td:nth-child(3),.content table tr>td:nth-child(3){width:38%!important;text-align:center!important;}' +
+    '.docgen-official-template table tr>td:nth-child(3) p,.content table tr>td:nth-child(3) p{text-align:center!important;}' +
+    '.docgen-official-template table col:nth-child(4),.content table col:nth-child(4),' +
+    '.docgen-official-template table tr>td:nth-child(4),.content table tr>td:nth-child(4){width:16%!important;}' +
+    '.docgen-official-template table col:nth-child(5),.content table col:nth-child(5),' +
+    '.docgen-official-template table tr>td:nth-child(5),.content table tr>td:nth-child(5){width:22%!important;}' +
+    '</style>';
+
+  return tableStyles + sourceHtml;
+}
+
+function normalizeOficioTableLayout_(html) {
+  const columnWidths = ['24.65pt', '73.5pt', '118.1pt', '79.5pt', '90.35pt'];
+
+  return String(html || '').replace(/<table\b[\s\S]*?<\/table>/gi, function(tableHtml) {
+    const hasAgreementColumn = /TIPO\s+DE\s+CONVENIO/i.test(tableHtml) || /\*\*TC[1-3]\*\*/i.test(tableHtml);
+    const hasCeafColumn = /\*\*CEAF[1-3]\*\*/i.test(tableHtml) || />\s*CEAF\s*</i.test(tableHtml);
+    if (!hasAgreementColumn || !hasCeafColumn) {
+      return tableHtml;
+    }
+
+    let normalizedTable = tableHtml.replace(/^<table\b([^>]*)>/i, function(match, attributes) {
+      return '<table' + setHtmlInlineStyle_(attributes, 'table-layout', 'fixed') + '>';
+    });
+
+    normalizedTable = normalizedTable.replace(/<tr\b([^>]*)>([\s\S]*?)<\/tr>/gi, function(rowMatch, rowAttributes, rowHtml) {
+      let cellIndex = 0;
+      const normalizedRow = rowHtml.replace(/<td\b([^>]*)>([\s\S]*?)<\/td>/gi, function(cellMatch, cellAttributes, cellHtml) {
+        const width = columnWidths[cellIndex];
+        let normalizedCellHtml = cellHtml;
+
+        if (cellIndex === 2) {
+          normalizedCellHtml = normalizedCellHtml.replace(/<p\b([^>]*)>/gi, function(paragraphMatch, paragraphAttributes) {
+            return '<p' + setHtmlInlineStyle_(paragraphAttributes, 'text-align', 'center') + '>';
+          });
+        }
+
+        cellIndex += 1;
+        if (!width) {
+          return cellMatch;
+        }
+        return '<td' + setHtmlInlineStyle_(cellAttributes, 'width', width) + '>' + normalizedCellHtml + '</td>';
+      });
+
+      return '<tr' + rowAttributes + '>' + normalizedRow + '</tr>';
+    });
+
+    return normalizedTable;
+  });
+}
+
+function setHtmlInlineStyle_(attributes, property, value) {
+  const sourceAttributes = String(attributes || '');
+  const styleMatch = sourceAttributes.match(/\sstyle=(['"])(.*?)\1/i);
+  const declarations = styleMatch
+    ? styleMatch[2].split(';').map(function(declaration) { return declaration.trim(); }).filter(Boolean)
+    : [];
+  const propertyPattern = new RegExp('^' + property.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*:', 'i');
+  let propertyUpdated = false;
+
+  const nextDeclarations = declarations.map(function(declaration) {
+    if (!propertyPattern.test(declaration)) {
+      return declaration;
+    }
+    propertyUpdated = true;
+    return property + ':' + value;
+  });
+  if (!propertyUpdated) {
+    nextDeclarations.push(property + ':' + value);
+  }
+
+  const nextStyle = 'style="' + nextDeclarations.join('; ') + ';"';
+  if (styleMatch) {
+    return sourceAttributes.replace(styleMatch[0], ' ' + nextStyle);
+  }
+  return sourceAttributes + ' ' + nextStyle;
 }
 
 function stripCreatorNameLine_(html) {

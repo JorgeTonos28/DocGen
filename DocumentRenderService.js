@@ -35,7 +35,27 @@ function renderDocumentHtml_(payload, actor, regionalOverride) {
     html = html.replace(new RegExp('<tr id="ceaf' + i + '".*?<\\/tr>', 'gs'), '');
   }
 
-  return normalizeOficioTableLayout_(html);
+  return injectOficioTableLayoutStyles_(normalizeOficioTableLayout_(html));
+}
+
+function injectOficioTableLayoutStyles_(html) {
+  const sourceHtml = String(html || '');
+  const styleMarker = 'data-docgen-oficio-table-layout';
+  if (sourceHtml.indexOf(styleMarker) !== -1) {
+    return sourceHtml;
+  }
+
+  const tableStyles = '<style ' + styleMarker + '>' +
+    '.docgen-official-template table,.content table{table-layout:fixed!important;width:440.85pt!important;}' +
+    '.docgen-official-template table tr>td:nth-child(1),.content table tr>td:nth-child(1){width:8%!important;}' +
+    '.docgen-official-template table tr>td:nth-child(2),.content table tr>td:nth-child(2){width:18%!important;}' +
+    '.docgen-official-template table tr>td:nth-child(3),.content table tr>td:nth-child(3){width:30%!important;text-align:center!important;}' +
+    '.docgen-official-template table tr>td:nth-child(3) p,.content table tr>td:nth-child(3) p{text-align:center!important;}' +
+    '.docgen-official-template table tr>td:nth-child(4),.content table tr>td:nth-child(4){width:20%!important;}' +
+    '.docgen-official-template table tr>td:nth-child(5),.content table tr>td:nth-child(5){width:24%!important;}' +
+    '</style>';
+
+  return tableStyles + sourceHtml;
 }
 
 function normalizeOficioTableLayout_(html) {

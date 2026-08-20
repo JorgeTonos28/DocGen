@@ -46,13 +46,18 @@ function injectOficioTableLayoutStyles_(html) {
   }
 
   const tableStyles = '<style ' + styleMarker + '>' +
-    '.docgen-official-template table,.content table{table-layout:fixed!important;width:440.85pt!important;}' +
-    '.docgen-official-template table tr>td:nth-child(1),.content table tr>td:nth-child(1){width:8%!important;}' +
-    '.docgen-official-template table tr>td:nth-child(2),.content table tr>td:nth-child(2){width:18%!important;}' +
-    '.docgen-official-template table tr>td:nth-child(3),.content table tr>td:nth-child(3){width:30%!important;text-align:center!important;}' +
+    '.docgen-official-template table,.content table{table-layout:fixed!important;width:100%!important;max-width:none!important;}' +
+    '.docgen-official-template table col:nth-child(1),.content table col:nth-child(1),' +
+    '.docgen-official-template table tr>td:nth-child(1),.content table tr>td:nth-child(1){width:7%!important;}' +
+    '.docgen-official-template table col:nth-child(2),.content table col:nth-child(2),' +
+    '.docgen-official-template table tr>td:nth-child(2),.content table tr>td:nth-child(2){width:17%!important;}' +
+    '.docgen-official-template table col:nth-child(3),.content table col:nth-child(3),' +
+    '.docgen-official-template table tr>td:nth-child(3),.content table tr>td:nth-child(3){width:38%!important;text-align:center!important;}' +
     '.docgen-official-template table tr>td:nth-child(3) p,.content table tr>td:nth-child(3) p{text-align:center!important;}' +
-    '.docgen-official-template table tr>td:nth-child(4),.content table tr>td:nth-child(4){width:20%!important;}' +
-    '.docgen-official-template table tr>td:nth-child(5),.content table tr>td:nth-child(5){width:24%!important;}' +
+    '.docgen-official-template table col:nth-child(4),.content table col:nth-child(4),' +
+    '.docgen-official-template table tr>td:nth-child(4),.content table tr>td:nth-child(4){width:16%!important;}' +
+    '.docgen-official-template table col:nth-child(5),.content table col:nth-child(5),' +
+    '.docgen-official-template table tr>td:nth-child(5),.content table tr>td:nth-child(5){width:22%!important;}' +
     '</style>';
 
   return tableStyles + sourceHtml;
